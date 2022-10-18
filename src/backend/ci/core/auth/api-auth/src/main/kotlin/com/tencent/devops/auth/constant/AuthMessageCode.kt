@@ -82,4 +82,14 @@ object AuthMessageCode {
     const val LOGIN_USER_INFO_EXIST = "2121502" // 权限系统： 用户已存在，无需重复创建
     const val LOGIN_USER_FREEZE = "212503" // 账号冻结中
     const val LOGIN_TOKEN_VERIFY_FAILED = "2121504" // 权限系统: token验证失败
+
+    const val ACTION_EXIST = "2121301" // 权限系统： action{0}已经存在
+    const val RESOURCE_EXSIT = "2121302" // 权限系统：resource{0}已经存在
+    const val RESOURCE_NOT_EXSIT = "2121303" // 权限系统：resource{0}不存在
+    const val ACTION_CREATE_FAIL = "2121304" // 权限系统： action添加失败
+    const val PERMISSION_MODEL_CHECK_FAIL = "2121305" // 权限系统： 权限模型校验失败
+    const val EXPIRED_DAY_ERROR = "2121307" // 权限系统： 超时时间最大设置365天
+    const val ADD_GROUP_USER_MORE_MUST = "2121308" // 权限系统：添加用户到用户组单次最多添加100人
+    const val GROUP_USER_COUNT_OUT_OF_BOUNDS = "2121309" // 权限系统：用户组人数超阈值
+    const val USER_EXIST_JOIN_GROUP = "2121310" // 权限系统：用户{0}已经加入用户组{1}
 }
