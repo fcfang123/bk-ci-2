@@ -30,8 +30,6 @@ package com.tencent.devops.auth.common
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tencent.bk.sdk.iam.config.IamConfiguration
 import com.tencent.bk.sdk.iam.service.impl.GrantServiceImpl
-import com.tencent.devops.auth.dao.ActionDao
-import com.tencent.devops.auth.dao.ResourceDao
 import com.tencent.devops.auth.filter.BlackListAspect
 import com.tencent.devops.auth.filter.TokenCheckFilter
 import com.tencent.devops.auth.refresh.dispatch.AuthRefreshDispatch
@@ -41,10 +39,6 @@ import com.tencent.devops.auth.service.DefaultDeptServiceImpl
 import com.tencent.devops.auth.service.DeptService
 import com.tencent.devops.auth.service.LocalManagerService
 import com.tencent.devops.auth.service.OrganizationService
-import com.tencent.devops.auth.service.action.impl.SimpleBkActionServiceImpl
-import com.tencent.devops.auth.service.action.impl.SimpleBkResourceServiceImpl
-import com.tencent.devops.auth.service.iam.ActionService
-import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.PermissionExtService
 import com.tencent.devops.auth.service.iam.PermissionGradeService
 import com.tencent.devops.auth.service.iam.PermissionGrantService
@@ -67,7 +61,6 @@ import com.tencent.devops.auth.utils.HostUtils
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.client.ClientTokenService
 import com.tencent.devops.common.event.dispatcher.pipeline.mq.MQ
-import org.jooq.DSLContext
 import org.springframework.amqp.core.Binding
 import org.springframework.amqp.core.BindingBuilder
 import org.springframework.amqp.core.DirectExchange
