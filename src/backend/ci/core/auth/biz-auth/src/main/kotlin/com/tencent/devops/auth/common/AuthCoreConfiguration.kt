@@ -27,14 +27,19 @@
 
 package com.tencent.devops.auth.common
 
+import IamBkActionServiceImpl
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tencent.bk.sdk.iam.config.IamConfiguration
+import com.tencent.bk.sdk.iam.service.IamActionService
+import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.bk.sdk.iam.service.SystemService
 import com.tencent.bk.sdk.iam.service.impl.ActionServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.ApigwHttpClientServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.GrantServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.ResourceServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.SystemServiceImpl
+import com.tencent.devops.auth.dao.ActionDao
+import com.tencent.devops.auth.dao.ResourceDao
 import com.tencent.devops.auth.filter.BlackListAspect
 import com.tencent.devops.auth.filter.TokenCheckFilter
 import com.tencent.devops.auth.refresh.dispatch.AuthRefreshDispatch
@@ -44,6 +49,8 @@ import com.tencent.devops.auth.service.DefaultDeptServiceImpl
 import com.tencent.devops.auth.service.DeptService
 import com.tencent.devops.auth.service.LocalManagerService
 import com.tencent.devops.auth.service.OrganizationService
+import com.tencent.devops.auth.service.iam.ActionService
+import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.PermissionExtService
 import com.tencent.devops.auth.service.iam.PermissionGradeService
 import com.tencent.devops.auth.service.iam.PermissionGrantService
@@ -52,6 +59,7 @@ import com.tencent.devops.auth.service.iam.PermissionRoleMemberService
 import com.tencent.devops.auth.service.iam.PermissionRoleService
 import com.tencent.devops.auth.service.iam.PermissionService
 import com.tencent.devops.auth.service.iam.PermissionUrlService
+import com.tencent.devops.auth.service.iam.impl.IamBkResourceServiceImpl
 import com.tencent.devops.auth.service.sample.SampleAuthPermissionProjectService
 import com.tencent.devops.auth.service.sample.SampleAuthPermissionService
 import com.tencent.devops.auth.service.sample.SampleGrantPermissionServiceImpl
@@ -66,6 +74,7 @@ import com.tencent.devops.auth.utils.HostUtils
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.client.ClientTokenService
 import com.tencent.devops.common.event.dispatcher.pipeline.mq.MQ
+import org.jooq.DSLContext
 import org.springframework.amqp.core.Binding
 import org.springframework.amqp.core.BindingBuilder
 import org.springframework.amqp.core.DirectExchange
@@ -230,4 +239,40 @@ class AuthCoreConfiguration {
         apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
         systemService: SystemService
     ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
+
+    @Bean
+    @ConditionalOnMissingBean(ActionService::class)
+    fun ciIamActionService(
+        dslContext: DSLContext,
+        actionDao: ActionDao,
+        resourceService: BkResourceService,
+        iamConfiguration: IamConfiguration,
+        systemService: SystemService,
+        iamActionService: IamActionService,
+        iamResourceService: IamResourceService
+    ) = IamBkActionServiceImpl(
+        dslContext = dslContext,
+        actionDao = actionDao,
+        resourceService = resourceService,
+        iamConfiguration = iamConfiguration,
+        systemService = systemService,
+        iamActionService = iamActionService,
+        iamResourceService = iamResourceService
+    )
+
+    @Bean
+    @ConditionalOnMissingBean(BkResourceService::class)
+    fun ciIamResourceService(
+        dslContext: DSLContext,
+        resourceDao: ResourceDao,
+        iamConfiguration: IamConfiguration,
+        iamResourceService: IamResourceService,
+        iamSystemService: SystemService
+    ) = IamBkResourceServiceImpl(
+        dslContext = dslContext,
+        resourceDao = resourceDao,
+        iamConfiguration = iamConfiguration,
+        iamResourceService = iamResourceService,
+        iamSystemService = iamSystemService
+    )
 }
