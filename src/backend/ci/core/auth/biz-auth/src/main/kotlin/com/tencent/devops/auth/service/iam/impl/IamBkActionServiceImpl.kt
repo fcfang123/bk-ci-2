@@ -50,8 +50,10 @@ import com.tencent.devops.common.auth.api.AuthResourceType
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Service
 
 @Suppress("ALL")
+@Service
 class IamBkActionServiceImpl @Autowired constructor(
     override val dslContext: DSLContext,
     override val actionDao: ActionDao,

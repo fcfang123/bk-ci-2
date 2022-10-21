@@ -47,8 +47,10 @@ import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Service
 import javax.annotation.PostConstruct
 
+@Service
 class IamBkResourceServiceImpl @Autowired constructor(
     override val dslContext: DSLContext,
     override val resourceDao: ResourceDao,
