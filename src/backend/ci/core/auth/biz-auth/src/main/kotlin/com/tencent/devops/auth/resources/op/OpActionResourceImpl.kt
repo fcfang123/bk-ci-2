@@ -30,7 +30,6 @@ package com.tencent.devops.auth.resources.op
 import com.tencent.devops.auth.api.op.OpActionResource
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.ActionService
 import com.tencent.devops.common.api.pojo.Result
 import com.tencent.devops.common.web.RestResource
@@ -46,9 +45,5 @@ class OpActionResourceImpl @Autowired constructor(
 
     override fun deleteSystemAction(userId: String, actionInfo: DeteleActionDTO): Result<Boolean> {
         return Result(actionService.deleteAction(userId, actionInfo))
-    }
-
-    override fun updateSystemAction(userId: String, actionId: String, actionInfo: UpdateActionDTO): Result<Boolean> {
-        return Result(actionService.updateAction(userId, actionId, actionInfo))
     }
 }

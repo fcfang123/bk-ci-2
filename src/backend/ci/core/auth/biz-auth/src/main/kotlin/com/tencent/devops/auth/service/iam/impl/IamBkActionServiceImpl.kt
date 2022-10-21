@@ -28,7 +28,6 @@ import com.tencent.bk.sdk.iam.config.IamConfiguration
 import com.tencent.bk.sdk.iam.constants.ActionTypeEnum
 import com.tencent.bk.sdk.iam.dto.action.ActionDTO
 import com.tencent.bk.sdk.iam.dto.action.ActionGroupDTO
-import com.tencent.bk.sdk.iam.dto.action.ActionUpdateDTO
 import com.tencent.bk.sdk.iam.dto.action.GroupAction
 import com.tencent.bk.sdk.iam.dto.resource.RelatedResourceTypeDTO
 import com.tencent.bk.sdk.iam.dto.resource.ResourceActionDTO
@@ -43,7 +42,6 @@ import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.impl.BKActionServiceImpl
 import com.tencent.devops.common.api.exception.ErrorCodeException
@@ -69,8 +67,10 @@ class IamBkActionServiceImpl @Autowired constructor(
         val systemId = iamConfiguration.systemId
         val actionGroups = systemService.getSystemFieldsInfo(systemId).actionGroup
         logger.info("oldActionGroups :$actionGroups")
-        // 首先校验是否存在动作组，若不存在，则actionGroupName、actionGroupEnglishName不能为空
+        // 校验是否存在动作组，若不存在，则actionGroupName、actionGroupEnglishName不能为空
         val isExistActionGroup = validateActionGroup(actionGroups, action)
+        // 校验是否存在新建关联，若不存在，则首个action的资源类型必须是project
+        validateResourceCreatorRelation(userId, action)
         // 1、创建action
         val iamCreateAction = buildAction(action)
         val iamActions = mutableListOf<ActionDTO>()
@@ -81,14 +81,6 @@ class IamBkActionServiceImpl @Autowired constructor(
         addActionToActionGroup(isExistActionGroup, action, actionGroups)
         // 3、维护系统新建关联yml（不存在添加，存在继续追击。 create类挂project级别，其他action挂对应资源子集）
         createRelation(action)
-    }
-
-    override fun extSystemUpdate(userId: String, actionId: String, action: UpdateActionDTO) {
-        val iamUpdateAction = ActionUpdateDTO()
-        iamUpdateAction.name = action.actionName
-        iamUpdateAction.englishName = action.actionEnglishName
-        iamUpdateAction.description = action.desc
-        iamActionService.updateAction(actionId, iamUpdateAction)
     }
 
     override fun extSystemDelete(userId: String, action: DeteleActionDTO) {
@@ -113,43 +105,16 @@ class IamBkActionServiceImpl @Autowired constructor(
         // 删除动作
         iamActionService.deleteAction(actionId, true)
         // 修改动作组
-        run run@{
-            actionGroups.forEach { actionGroupDTO ->
-                if (actionGroupDTO.name == action.actionGroupName) {
-                    actionGroupDTO.actions.forEach {
-                        if (actionId == it.id)
-                            actionGroupDTO.actions.remove(it)
-                        return@run
-                    }
-                }
-            }
-        }
-        iamActionService.updateActionGroup(actionGroups)
+        updateActionGroup(actionId, actionGroups, action)
         // 修改关联操作
-        val systemCreateRelationInfo = systemService.getSystemFieldsInfo(systemId).resourceCreatorActions
-        if (action.resourceId == "project" || actionId.substring(actionId.lastIndexOf("_") + 1) == "create") {
-            systemCreateRelationInfo.config[0].actions.forEach {
-                if (it.id == actionId)
-                    systemCreateRelationInfo.config[0].actions.remove(it)
-            }
-        } else {
-            systemCreateRelationInfo.config[0].subResourceType.forEach {
-                if (it.id == actionId)
-                    systemCreateRelationInfo.config[0].subResourceType.remove(it)
-            }
-        }
-        iamActionService.updateResourceCreatorAction(systemCreateRelationInfo)
+        updateResourceCreatorRelation(action, systemId, actionId)
     }
 
     private fun createRelation(action: CreateActionDTO) {
         val systemId = iamConfiguration.systemId
         val systemCreateRelationInfo = systemService.getSystemFieldsInfo(systemId).resourceCreatorActions
-
         // 如果资源是项目。或者其他资源但是操作类型是create。都需要加到项目的新建关联。
         if (systemCreateRelationInfo == null) {
-            if (action.resourceId != AuthResourceType.PROJECT.value) {
-                logger.warn("first action must project,please create project resource before ${action.actionId}")
-            }
             val resourceCreatorActions = buildCreateRelation(action, systemCreateRelationInfo)
             logger.info("createRelation create ${action.actionId} $resourceCreatorActions")
             iamActionService.createResourceCreatorAction(resourceCreatorActions)
@@ -193,7 +158,9 @@ class IamBkActionServiceImpl @Autowired constructor(
             actionGroups.forEachIndexed { index, actionGroupDTO ->
                 val actions = actionGroupDTO.actions
                 actions.forEach {
-                    if (it.id.substring(0, it.id.lastIndexOf("_")) == action.resourceId) {
+                    val actionGroupResource = it.id.substring(0, it.id.lastIndexOf("_"))
+                    if (actionGroupResource == action.resourceId) {
+                        logger.info("validateActionGroup : actionGroupResource = $actionGroupResource")
                         isExistActionGroup = true
                         return@run
                     }
@@ -201,8 +168,8 @@ class IamBkActionServiceImpl @Autowired constructor(
             }
         }
         if (!isExistActionGroup &&
-            (action.actionGroupName?.isEmpty() == true ||
-                action.actionGroupEnglishName?.isEmpty() == true)) {
+            (action.actionGroupName == null ||
+                action.actionGroupEnglishName == null)) {
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.PARAM_CHECK_FAIL,
                 defaultMessage = "For the newly added action, if its action group has not been created," +
@@ -212,6 +179,63 @@ class IamBkActionServiceImpl @Autowired constructor(
         return isExistActionGroup
     }
 
+    private fun validateResourceCreatorRelation(
+        systemId: String,
+        action: CreateActionDTO
+    ) {
+        val systemCreateRelationInfo = systemService.getSystemFieldsInfo(systemId).resourceCreatorActions
+        if (systemCreateRelationInfo == null && action.resourceId != AuthResourceType.PROJECT.value) {
+            logger.warn("first action must project,please create project resource before ${action.actionId}")
+            throw throw ErrorCodeException(
+                errorCode = AuthMessageCode.CREATE_RESOURCE_CREATOR_RELATION_FAIL,
+                defaultMessage = "first action must project,please create project resource before ${action.actionId}"
+            )
+        }
+    }
+
+    private fun updateActionGroup(
+        actionId: String,
+        actionGroups: MutableList<ActionGroupDTO>,
+        action: DeteleActionDTO
+    ) {
+        iamActionService.deleteAction(actionId, true)
+        // 修改动作组
+        run run@{
+            actionGroups.forEach { actionGroupDTO ->
+                if (actionGroupDTO.name == action.actionGroupName) {
+                    actionGroupDTO.actions.forEach {
+                        if (actionId == it.id)
+                            actionGroupDTO.actions.remove(it)
+                        return@run
+                    }
+                }
+            }
+        }
+        logger.info("newActionGroup: $actionGroups")
+        iamActionService.updateActionGroup(actionGroups)
+    }
+
+    private fun updateResourceCreatorRelation(
+        action: DeteleActionDTO,
+        systemId: String,
+        actionId: String
+    ) {
+        val systemCreateRelationInfo = systemService.getSystemFieldsInfo(systemId).resourceCreatorActions
+        if (action.resourceId == AuthResourceType.PROJECT.value ||
+            actionId.substring(actionId.lastIndexOf("_") + 1) == ActionTypeEnum.CREATE.type) {
+            systemCreateRelationInfo.config[0].actions.forEach {
+                if (it.id == actionId)
+                    systemCreateRelationInfo.config[0].actions.remove(it)
+            }
+        } else {
+            systemCreateRelationInfo.config[0].subResourceType.forEach {
+                if (it.id == actionId)
+                    systemCreateRelationInfo.config[0].subResourceType.remove(it)
+            }
+        }
+        iamActionService.updateResourceCreatorAction(systemCreateRelationInfo)
+    }
+
     private fun addActionToActionGroup(
         isExistActionGroup: Boolean,
         action: CreateActionDTO,
@@ -219,11 +243,13 @@ class IamBkActionServiceImpl @Autowired constructor(
     ) {
         // 若是动作组还未创建，则先创建动作组，再把动作加入
         if (!isExistActionGroup) {
-            val groupAction = GroupAction()
-            groupAction.id = action.actionId
+            // 动作组
             val actionGroup = ActionGroupDTO()
             actionGroup.name = action.actionGroupName
             actionGroup.englishName = action.actionGroupEnglishName
+            // 动作组内单个动作
+            val groupAction = GroupAction()
+            groupAction.id = action.actionId
             actionGroup.actions = listOf(groupAction)
             actionGroups.add(actionGroup)
         } else {
@@ -314,15 +340,17 @@ class IamBkActionServiceImpl @Autowired constructor(
             resourceAction.required = false
             resourceCreateConfig.id = action.resourceId
             resourceCreateConfig.actions = arrayListOf(resourceAction)
-
             resourceCreatorActions.config = arrayOf(resourceCreateConfig).toMutableList()
         } else {
             // 蓝盾默认只有两级。 第一级必然是project
             val projectConfig = systemCreateRelationInfo.config[0]
             if (projectConfig.id != AuthResourceType.PROJECT.value) {
                 // 第一层不是project直接报错
+                // 逻辑有欠缺，若是走到这一步 关联创建不成功，上述动作和动作组不应该创建，而应该一并取消，但是理论上并不会走到这一步
+                throw throw ErrorCodeException(
+                    errorCode = AuthMessageCode.CREATE_RESOURCE_CREATOR_RELATION_FAIL,
+                )
             }
-
             // 判断新action操作类型， 如果是create或者资源是project，直接追加到project（第一层）下的action
             if (action.actionType.value == ActionTypeEnum.CREATE.type ||
                 action.resourceId == AuthResourceType.PROJECT.value
@@ -396,8 +424,6 @@ class IamBkActionServiceImpl @Autowired constructor(
     }
 
     companion object {
-        private const val SYSTEMNAME = "持续集成平台"
-        private const val ENGLISHNAME = "bkci"
         private const val PROJECT_SELECT_INSTANCE = "project_instance"
         private const val RESOURCE_SELECT_INSTANCE = "_instance"
         private val logger = LoggerFactory.getLogger(IamBkActionServiceImpl::class.java)

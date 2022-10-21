@@ -29,7 +29,6 @@ package com.tencent.devops.auth.api.op
 
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID
 import com.tencent.devops.common.api.pojo.Result
 import io.swagger.annotations.Api
@@ -39,9 +38,7 @@ import javax.ws.rs.Consumes
 import javax.ws.rs.DELETE
 import javax.ws.rs.HeaderParam
 import javax.ws.rs.POST
-import javax.ws.rs.PUT
 import javax.ws.rs.Path
-import javax.ws.rs.PathParam
 import javax.ws.rs.Produces
 import javax.ws.rs.core.MediaType
 
@@ -70,19 +67,5 @@ interface OpActionResource {
         userId: String,
         @ApiParam("actionInfo")
         actionInfo: DeteleActionDTO
-    ): Result<Boolean>
-
-    @PUT
-    @ApiOperation("修改系统操作action")
-    @Path("/{actionId}")
-    fun updateSystemAction(
-        @ApiParam("操作人")
-        @HeaderParam(AUTH_HEADER_USER_ID)
-        userId: String,
-        @ApiParam("资源编码")
-        @PathParam("actionId")
-        actionId: String,
-        @ApiParam("系统action参数")
-        actionInfo: UpdateActionDTO
     ): Result<Boolean>
 }

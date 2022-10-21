@@ -27,6 +27,7 @@
 
 package com.tencent.devops.auth
 
+import IamBkActionServiceImpl
 import com.tencent.bk.sdk.iam.config.IamConfiguration
 import com.tencent.bk.sdk.iam.service.IamActionService
 import com.tencent.bk.sdk.iam.service.IamResourceService
@@ -37,7 +38,6 @@ import com.tencent.bk.sdk.iam.service.impl.ResourceServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.SystemServiceImpl
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.dao.ResourceDao
-import com.tencent.devops.auth.service.action.impl.IamBkActionServiceImpl
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.impl.IamBkResourceServiceImpl
 import org.jooq.DSLContext
@@ -52,7 +52,7 @@ import org.springframework.core.Ordered
 @Configuration
 @ConditionalOnWebApplication
 @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
-@ConditionalOnProperty(prefix = "auth", name = ["idProvider"], havingValue = "bk_login_v3")
+//@ConditionalOnProperty(prefix = "auth", name = ["idProvider"], havingValue = "bk_login_v3")
 class IamV3AuthConfiguration {
 
     @Bean
@@ -99,13 +99,13 @@ class IamV3AuthConfiguration {
         dslContext: DSLContext,
         resourceDao: ResourceDao,
         iamConfiguration: IamConfiguration,
-        resourceService: IamResourceService,
+        iamResourceService: IamResourceService,
         iamSystemService: SystemService
     ) = IamBkResourceServiceImpl(
         dslContext = dslContext,
         resourceDao = resourceDao,
         iamConfiguration = iamConfiguration,
-        resourceService = resourceService,
+        iamResourceService = iamResourceService,
         iamSystemService = iamSystemService
     )
 }

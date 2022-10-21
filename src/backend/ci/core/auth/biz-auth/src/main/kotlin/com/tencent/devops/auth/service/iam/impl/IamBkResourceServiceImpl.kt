@@ -80,7 +80,6 @@ class IamBkResourceServiceImpl @Autowired constructor(
         )
         // 1. 创建资源类型
         createIamResource(resource)
-
         // 2. 资源视图
         buildIamResourceSelectorInstance(resourceInfo)
     }
@@ -119,7 +118,6 @@ class IamBkResourceServiceImpl @Autowired constructor(
     }
 
     private fun createIamResource(resource: CreateResourceDTO) {
-
         val systemId = iamConfiguration.systemId
         val resourceInfo = ResourceTypeDTO()
         resourceInfo.id = resource.resourceId
@@ -155,7 +153,6 @@ class IamBkResourceServiceImpl @Autowired constructor(
         val projectSelect = ResourceTypeChainDTO()
         projectSelect.id = AuthResourceType.PROJECT.value
         projectSelect.systemId = systemId
-
         var create = true
         // 如果存在视图做修改,不存在做新增
         selectInstance?.forEach {

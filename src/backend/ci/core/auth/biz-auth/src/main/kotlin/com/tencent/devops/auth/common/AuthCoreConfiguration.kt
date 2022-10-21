@@ -213,18 +213,18 @@ class AuthCoreConfiguration {
     @ConditionalOnMissingBean(OrganizationService::class)
     fun sampleOrganizationService() = SampleOrganizationService()
 
-    @Bean
-    @ConditionalOnMissingBean(ActionService::class)
+    /*//@Bean
+    //@ConditionalOnMissingBean(ActionService::class)
     fun simpleActionService(
         dslContext: DSLContext,
         actionDao: ActionDao,
         resourceService: BkResourceService
-    ) = SimpleBkActionServiceImpl(dslContext, actionDao, resourceService)
+    ) = SimpleBkActionServiceImpl(dslContext, actionDao, resourceService)*/
 
-    @Bean
+    /*@Bean
     @ConditionalOnMissingBean(BkResourceService::class)
     fun simpleResourceService(
         dslContext: DSLContext,
         resourceDao: ResourceDao
-    ) = SimpleBkResourceServiceImpl(dslContext, resourceDao)
+    ) = SimpleBkResourceServiceImpl(dslContext, resourceDao)*/
 }

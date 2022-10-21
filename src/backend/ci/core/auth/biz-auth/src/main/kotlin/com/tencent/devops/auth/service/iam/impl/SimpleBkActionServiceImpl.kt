@@ -32,7 +32,6 @@ import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.impl.BKActionServiceImpl
 import org.jooq.DSLContext
@@ -47,10 +46,6 @@ class SimpleBkActionServiceImpl @Autowired constructor(
 ) : BKActionServiceImpl(dslContext, actionDao, resourceService, iamActionService, iamResourceService) {
 
     override fun extSystemCreate(userId: String, action: CreateActionDTO) {
-        return
-    }
-
-    override fun extSystemUpdate(userId: String, actionId: String, action: UpdateActionDTO) {
         return
     }
 

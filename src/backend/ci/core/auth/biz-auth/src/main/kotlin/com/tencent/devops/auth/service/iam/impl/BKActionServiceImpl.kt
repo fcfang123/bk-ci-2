@@ -33,7 +33,6 @@ import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.ActionService
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.common.api.exception.ErrorCodeException
@@ -112,15 +111,7 @@ abstract class BKActionServiceImpl @Autowired constructor(
         return true
     }
 
-    override fun updateAction(userId: String, actionId: String, action: UpdateActionDTO): Boolean {
-        logger.info("updateAction $userId|$actionId|$action")
-        extSystemUpdate(userId, actionId, action)
-        return true
-    }
-
     abstract fun extSystemCreate(userId: String, action: CreateActionDTO)
-
-    abstract fun extSystemUpdate(userId: String, actionId: String, action: UpdateActionDTO)
 
     abstract fun extSystemDelete(userId: String, action: DeteleActionDTO)
 

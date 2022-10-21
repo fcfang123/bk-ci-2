@@ -96,4 +96,5 @@ object AuthMessageCode {
     const val ACTION_NOT_EXIST = "2121312" // 权限系统： action不存在存在
     const val ACTION_GROUP_NOT_EXIST = "2121313" // 权限系统： 动作组不存在
     const val ACTION_DELETE_FAIL = "2121314" // 权限系统： action删除失败
+    const val CREATE_RESOURCE_CREATOR_RELATION_FAIL = "2121315" // 权限系统： 创建新建关联失败
 }

@@ -34,6 +34,7 @@ import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.common.api.exception.ErrorCodeException
+import com.tencent.devops.common.auth.api.AuthResourceType
 import com.tencent.devops.common.service.utils.MessageCodeUtil
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
@@ -58,7 +59,7 @@ abstract class BkResourceServiceImpl @Autowired constructor(
             )
         }
         // 校验父类资源是否合法
-        if (resource.parent != null && resource.parent != "project") {
+        if (resource.parent != null && resource.parent != AuthResourceType.PROJECT.value) {
             logger.warn("createResource: parents illegal")
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.PERMISSION_MODEL_CHECK_FAIL,

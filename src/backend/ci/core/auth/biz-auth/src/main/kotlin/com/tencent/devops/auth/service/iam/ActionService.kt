@@ -29,12 +29,9 @@ package com.tencent.devops.auth.service.iam
 
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
 import com.tencent.devops.auth.pojo.action.DeteleActionDTO
-import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 
 interface ActionService {
     fun createAction(userId: String, action: CreateActionDTO): Boolean
-
-    fun updateAction(userId: String, actionId: String, action: UpdateActionDTO): Boolean
 
     fun deleteAction(userId: String, action: DeteleActionDTO): Boolean
 }
