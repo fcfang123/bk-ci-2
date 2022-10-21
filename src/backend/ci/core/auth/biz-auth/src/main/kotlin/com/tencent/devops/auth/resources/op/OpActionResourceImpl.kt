@@ -28,8 +28,8 @@
 package com.tencent.devops.auth.resources.op
 
 import com.tencent.devops.auth.api.op.OpActionResource
-import com.tencent.devops.auth.pojo.action.ActionInfo
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
+import com.tencent.devops.auth.pojo.action.DeteleActionDTO
 import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.ActionService
 import com.tencent.devops.common.api.pojo.Result
@@ -44,24 +44,11 @@ class OpActionResourceImpl @Autowired constructor(
         return Result(actionService.createAction(userId, actionInfo))
     }
 
+    override fun deleteSystemAction(userId: String, actionInfo: DeteleActionDTO): Result<Boolean> {
+        return Result(actionService.deleteAction(userId, actionInfo))
+    }
+
     override fun updateSystemAction(userId: String, actionId: String, actionInfo: UpdateActionDTO): Result<Boolean> {
         return Result(actionService.updateAction(userId, actionId, actionInfo))
-    }
-
-    override fun getAction(actionId: String): Result<ActionInfo?> {
-        return Result(actionService.getAction(actionId))
-    }
-
-    override fun listAllAction(): Result<List<ActionInfo>?> {
-        return Result(actionService.actionList())
-    }
-
-    override fun listActionResource(): Result<Map<String, List<ActionInfo>>?> {
-        return Result(actionService.actionMap())
-    }
-
-    override fun listActionByResource(resourceId: String): Result<List<ActionInfo>?> {
-        val actionMap = actionService.actionMap() ?: return Result(emptyList())
-        return Result(actionMap[resourceId])
     }
 }

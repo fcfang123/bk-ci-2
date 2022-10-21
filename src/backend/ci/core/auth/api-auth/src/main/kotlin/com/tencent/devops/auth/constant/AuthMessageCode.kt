@@ -92,4 +92,8 @@ object AuthMessageCode {
     const val ADD_GROUP_USER_MORE_MUST = "2121308" // 权限系统：添加用户到用户组单次最多添加100人
     const val GROUP_USER_COUNT_OUT_OF_BOUNDS = "2121309" // 权限系统：用户组人数超阈值
     const val USER_EXIST_JOIN_GROUP = "2121310" // 权限系统：用户{0}已经加入用户组{1}
+    const val PARAM_CHECK_FAIL = "2121311"  // 权限系统：参数校验异常
+    const val ACTION_NOT_EXIST = "2121312" // 权限系统： action不存在存在
+    const val ACTION_GROUP_NOT_EXIST = "2121313" // 权限系统： 动作组不存在
+    const val ACTION_DELETE_FAIL = "2121314" // 权限系统： action删除失败
 }

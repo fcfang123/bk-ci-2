@@ -27,11 +27,10 @@
 
 package com.tencent.devops.auth.service.action.impl
 
-import com.google.common.cache.CacheBuilder
+import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.dao.ResourceDao
 import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
-import com.tencent.devops.auth.pojo.resource.ResourceInfo
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.common.api.exception.ErrorCodeException
@@ -39,22 +38,16 @@ import com.tencent.devops.common.service.utils.MessageCodeUtil
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import java.util.concurrent.TimeUnit
 
 abstract class BkResourceServiceImpl @Autowired constructor(
     open val dslContext: DSLContext,
-    open val resourceDao: ResourceDao
+    open val resourceDao: ResourceDao,
+    open val iamResourceService: IamResourceService,
 ) : BkResourceService {
-
-    private val resourceCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.DAYS)
-        .maximumSize(50)
-        .build<String, String>()
-
-
     override fun createResource(userId: String, resource: CreateResourceDTO): Boolean {
         // 判断此资源是否存在, 存在直接报错
-        if (resourceDao.getResourceById(dslContext, resource.resourceId) != null) {
+        val isExistResource = iamResourceService.resourceCheck(resource.resourceId)
+        if (isExistResource) {
             logger.warn("createResource $resource exist")
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.RESOURCE_EXSIT,
@@ -64,15 +57,9 @@ abstract class BkResourceServiceImpl @Autowired constructor(
                 )
             )
         }
-        val parentResources = mutableListOf<String>()
-        resourceDao.getParentResource(dslContext).map {
-            if (it.parent.isNullOrEmpty()) {
-                parentResources.add(it.resourcetype)
-            }
-        }
         // 校验父类资源是否合法
-        if (resource.parent != null && !parentResources.contains(resource.parent)) {
-            logger.warn("create parents ${resource.parent} is ")
+        if (resource.parent != null && resource.parent != "project") {
+            logger.warn("createResource: parents illegal")
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.PERMISSION_MODEL_CHECK_FAIL,
                 defaultMessage = MessageCodeUtil.getCodeLanMessage(
@@ -80,11 +67,6 @@ abstract class BkResourceServiceImpl @Autowired constructor(
                 )
             )
         }
-
-        // 添加资源类数据
-        resourceDao.createResource(dslContext, userId, resource)
-
-        // 此处为扩展类,操作蓝盾外的其他系统
         createExtSystem(resource)
         return true
     }
@@ -94,52 +76,17 @@ abstract class BkResourceServiceImpl @Autowired constructor(
         resourceId: String,
         resource: UpdateResourceDTO
     ): Boolean {
-        // 判断此资源是否存在
-        resourceDao.getResourceById(dslContext, resourceId)
-            ?: throw ErrorCodeException(
+        // 判断此资源是否存在, 不存在直接报错
+        val isExistResource = iamResourceService.resourceCheck(resourceId)
+        if (!isExistResource) {
+            logger.warn("createResource $resource not exist")
+            throw ErrorCodeException(
                 errorCode = AuthMessageCode.RESOURCE_NOT_EXSIT
             )
-
+        }
         // 修改资源类数据
-        resourceDao.updateResource(dslContext, userId, resourceId, resource)
         updateExtSystem(resource, resourceId)
         return true
-    }
-
-    override fun getResource(resourceType: String): ResourceInfo? {
-        return resourceDao.getResourceById(dslContext, resourceType)
-    }
-
-    override fun getResourceBySystem(systemId: String): List<ResourceInfo>? {
-        val records = resourceDao.getResourceBySystemId(dslContext, systemId)
-        val result = mutableListOf<ResourceInfo>()
-        records.map {
-            val resourceInfo = resourceDao.convert(it)
-            result.add(resourceInfo!!)
-        }
-        return result
-    }
-
-    override fun resourceList(): List<ResourceInfo>? {
-        val records = resourceDao.getAllResource(dslContext) ?: return emptyList()
-        val result = mutableListOf<ResourceInfo>()
-        records.map {
-            val resourceInfo = resourceDao.convert(it)
-            result.add(resourceInfo!!)
-        }
-        return result
-    }
-
-    override fun checkResource(resourceType: String): Boolean {
-        if (resourceCache.getIfPresent(resourceType) != null) {
-            return true
-        }
-        val resourceRecord = getResource(resourceType)
-        if (getResource(resourceType) != null) {
-            resourceCache.put(resourceType, resourceRecord!!.resourceId)
-            return true
-        }
-        return false
     }
 
     abstract fun createExtSystem(resource: CreateResourceDTO)

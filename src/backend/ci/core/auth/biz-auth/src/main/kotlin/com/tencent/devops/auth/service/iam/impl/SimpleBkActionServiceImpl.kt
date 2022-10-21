@@ -27,8 +27,11 @@
 
 package com.tencent.devops.auth.service.action.impl
 
+import com.tencent.bk.sdk.iam.service.IamActionService
+import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
+import com.tencent.devops.auth.pojo.action.DeteleActionDTO
 import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.impl.BKActionServiceImpl
@@ -38,14 +41,20 @@ import org.springframework.beans.factory.annotation.Autowired
 class SimpleBkActionServiceImpl @Autowired constructor(
     override val dslContext: DSLContext,
     override val actionDao: ActionDao,
-    override val resourceService: BkResourceService
-) : BKActionServiceImpl(dslContext, actionDao, resourceService) {
+    override val resourceService: BkResourceService,
+    override val iamActionService: IamActionService,
+    override val iamResourceService: IamResourceService
+) : BKActionServiceImpl(dslContext, actionDao, resourceService, iamActionService, iamResourceService) {
 
     override fun extSystemCreate(userId: String, action: CreateActionDTO) {
         return
     }
 
     override fun extSystemUpdate(userId: String, actionId: String, action: UpdateActionDTO) {
+        return
+    }
+
+    override fun extSystemDelete(userId: String, action: DeteleActionDTO) {
         return
     }
 }

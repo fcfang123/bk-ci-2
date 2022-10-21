@@ -44,5 +44,9 @@ data class CreateActionDTO(
     @ApiModelProperty("操作所属资源")
     val resourceId: String,
     @ApiModelProperty("操作类型")
-    val actionType: ActionType
+    val actionType: ActionType,
+    @ApiModelProperty("新增动作组名称")
+    val actionGroupName: String? = null,
+    @ApiModelProperty("新增动作组英文名称")
+    val actionGroupEnglishName: String? = null
 )

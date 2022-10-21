@@ -28,19 +28,10 @@
 package com.tencent.devops.auth.service.iam
 
 import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
-import com.tencent.devops.auth.pojo.resource.ResourceInfo
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
 
 interface BkResourceService {
     fun createResource(userId: String, resource: CreateResourceDTO): Boolean
 
     fun updateResource(userId: String, resourceId: String, resource: UpdateResourceDTO): Boolean
-
-    fun getResource(resourceType: String): ResourceInfo?
-
-    fun getResourceBySystem(systemId: String): List<ResourceInfo>?
-
-    fun resourceList(): List<ResourceInfo>?
-
-    fun checkResource(resourceType: String): Boolean
 }

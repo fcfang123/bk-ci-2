@@ -27,11 +27,12 @@
 
 package com.tencent.devops.auth.service.iam.impl
 
-import com.google.common.cache.CacheBuilder
+import com.tencent.bk.sdk.iam.service.IamActionService
+import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.dao.ActionDao
-import com.tencent.devops.auth.pojo.action.ActionInfo
 import com.tencent.devops.auth.pojo.action.CreateActionDTO
+import com.tencent.devops.auth.pojo.action.DeteleActionDTO
 import com.tencent.devops.auth.pojo.action.UpdateActionDTO
 import com.tencent.devops.auth.service.iam.ActionService
 import com.tencent.devops.auth.service.iam.BkResourceService
@@ -39,120 +40,91 @@ import com.tencent.devops.common.api.exception.ErrorCodeException
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import java.util.concurrent.TimeUnit
 
 abstract class BKActionServiceImpl @Autowired constructor(
     open val dslContext: DSLContext,
     open val actionDao: ActionDao,
-    open val resourceService: BkResourceService
+    open val resourceService: BkResourceService,
+    open val iamActionService: IamActionService,
+    open val iamResourceService: IamResourceService
 ) : ActionService {
-
-    /**
-     * 系统action缓存
-     */
-    private val actionMap = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.HOURS)
-        .maximumSize(200)
-        .build<String, List<String>>()
-
     override fun createAction(userId: String, action: CreateActionDTO): Boolean {
         logger.info("createAction $userId|$action")
         val actionId = action.actionId
         val resourceId = action.resourceId
-
         // 优先判断action挂靠资源是否存在
-        resourceService.getResource(resourceId) ?: throw ErrorCodeException(
-            errorCode = AuthMessageCode.RESOURCE_NOT_EXSIT,
-            params = arrayOf(action.resourceId)
-        )
-
+        val isExistResource = iamResourceService.resourceCheck(resourceId)
+        if (!isExistResource) {
+            throw ErrorCodeException(
+                errorCode = AuthMessageCode.RESOURCE_NOT_EXSIT,
+                params = arrayOf(resourceId)
+            )
+        }
         // action重复性校验
-        val actionInfo = actionDao.getAction(dslContext, actionId, "RESOURCEID")
+        val actionInfo = iamActionService.getAction(actionId)
         if (actionInfo != null) {
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.ACTION_EXIST,
-                params = arrayOf(action.actionId)
+                params = arrayOf(actionId)
             )
         }
-
         try {
-            actionDao.createAction(dslContext, action, userId)
             // 添加扩展系统权限
             extSystemCreate(userId, action)
             return true
         } catch (e: Exception) {
             logger.warn("create action fail $userId|$action|$e")
-            actionDao.deleteAction(dslContext, actionId)
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.ACTION_CREATE_FAIL
             )
         }
     }
 
-    override fun updateAction(userId: String, actionId: String, action: UpdateActionDTO): Boolean {
-        logger.info("updateAction $userId|$actionId|$action")
-        actionDao.getAction(dslContext, actionId, "RESOURCEID")
-            ?: throw ErrorCodeException(
+    override fun deleteAction(userId: String, action: DeteleActionDTO): Boolean {
+        logger.info("deleteAction $userId|$action")
+        val actionId = action.actionId
+        val resourceId = action.resourceId
+        val isExistResource = iamResourceService.resourceCheck(resourceId)
+        if (!isExistResource) {
+            throw ErrorCodeException(
                 errorCode = AuthMessageCode.RESOURCE_NOT_EXSIT,
-                params = arrayOf(action.resourceId)
+                params = arrayOf(resourceId)
             )
-        actionDao.updateAction(dslContext, action, actionId, userId)
-        extSystemUpdate(userId, actionId, action)
+        }
+        // action是否存在校验
+        val actionInfo = iamActionService.getAction(actionId)
+        if (actionInfo == null) {
+            throw ErrorCodeException(
+                errorCode = AuthMessageCode.ACTION_NOT_EXIST,
+                params = arrayOf(actionId)
+            )
+        }
+        try {
+            // 删除扩展系统权限
+            extSystemDelete(userId, action)
+            return true
+        } catch (e: Exception) {
+            logger.warn("create action fail $userId|$action|$e")
+            throw ErrorCodeException(
+                errorCode = AuthMessageCode.ACTION_DELETE_FAIL
+            )
+        }
         return true
     }
 
-    override fun getAction(actionId: String): ActionInfo? {
-        return actionDao.getAction(dslContext, actionId, "*")
-    }
-
-    override fun getActions(actionIds: List<String>): List<ActionInfo>? {
-        return actionDao.getActions(dslContext, actionIds)
-    }
-
-    override fun actionList(): List<ActionInfo>? {
-        return actionDao.getAllAction(dslContext, "*")
-    }
-
-    override fun actionMap(): Map<String, List<ActionInfo>>? {
-        val actionInfos = actionDao.getAllAction(dslContext, "*") ?: return emptyMap()
-        val actionMap = mutableMapOf<String, List<ActionInfo>>()
-        actionInfos.forEach {
-            if (actionMap[it.resourceId] == null) {
-                actionMap[it.resourceId] = arrayListOf(it)
-            } else {
-                val newActionList = mutableListOf<ActionInfo>()
-                val actionList = actionMap[it.resourceId]
-                newActionList.addAll(actionList!!)
-                newActionList.add(it)
-                actionMap[it.resourceId] = newActionList
-            }
-        }
-        return actionMap
-    }
-
-    override fun checkSystemAction(actions: List<String>): Boolean {
-        if (actionMap.getIfPresent(ACTION_MAP_KEY) != null) {
-            val systemAction = actionMap.getIfPresent(ACTION_MAP_KEY)
-            if (actions.intersect(systemAction!!).size == actions.size) {
-                return true
-            }
-        }
-        val systemActions = actionDao.getAllAction(dslContext, "*")?.map {
-            it.actionId
-        } ?: return false
-        if (actions.intersect(systemActions!!).size == actions.size) {
-            actionMap.put(ACTION_MAP_KEY, systemActions)
-            return true
-        }
-        return false
+    override fun updateAction(userId: String, actionId: String, action: UpdateActionDTO): Boolean {
+        logger.info("updateAction $userId|$actionId|$action")
+        extSystemUpdate(userId, actionId, action)
+        return true
     }
 
     abstract fun extSystemCreate(userId: String, action: CreateActionDTO)
 
     abstract fun extSystemUpdate(userId: String, actionId: String, action: UpdateActionDTO)
 
+    abstract fun extSystemDelete(userId: String, action: DeteleActionDTO)
+
     companion object {
         val logger = LoggerFactory.getLogger(BKActionServiceImpl::class.java)
-        const val ACTION_MAP_KEY = "ci"
     }
 }

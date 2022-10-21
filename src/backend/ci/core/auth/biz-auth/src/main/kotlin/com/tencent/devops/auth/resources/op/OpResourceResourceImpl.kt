@@ -28,9 +28,7 @@
 package com.tencent.devops.auth.resources.op
 
 import com.tencent.devops.auth.api.op.OpResourceResource
-import com.tencent.devops.auth.pojo.enum.SystemType
 import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
-import com.tencent.devops.auth.pojo.resource.ResourceInfo
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.common.api.pojo.Result
@@ -51,17 +49,5 @@ class OpResourceResourceImpl @Autowired constructor(
         resourceInfo: UpdateResourceDTO
     ): Result<Boolean> {
         return Result(resourceService.updateResource(userId, resourceId, resourceInfo))
-    }
-
-    override fun getSystemResource(resourceId: String): Result<ResourceInfo?> {
-        return Result(resourceService.getResource(resourceId))
-    }
-
-    override fun getSystemResourceBySystem(systemId: SystemType): Result<List<ResourceInfo>?> {
-        return Result(resourceService.getResourceBySystem(systemId.name))
-    }
-
-    override fun listSystemResource(): Result<List<ResourceInfo>?> {
-        return Result(resourceService.resourceList())
     }
 }

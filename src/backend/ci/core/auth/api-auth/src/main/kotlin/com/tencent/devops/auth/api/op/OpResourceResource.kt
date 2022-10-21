@@ -27,9 +27,7 @@
 
 package com.tencent.devops.auth.api.op
 
-import com.tencent.devops.auth.pojo.enum.SystemType
 import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
-import com.tencent.devops.auth.pojo.resource.ResourceInfo
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID
 import com.tencent.devops.common.api.pojo.Result
@@ -37,7 +35,6 @@ import io.swagger.annotations.Api
 import io.swagger.annotations.ApiOperation
 import io.swagger.annotations.ApiParam
 import javax.ws.rs.Consumes
-import javax.ws.rs.GET
 import javax.ws.rs.HeaderParam
 import javax.ws.rs.POST
 import javax.ws.rs.PUT
@@ -76,27 +73,4 @@ interface OpResourceResource {
         @ApiParam("系统资源参数")
         resourceInfo: UpdateResourceDTO
     ): Result<Boolean>
-
-    @GET
-    @ApiOperation("获取资源信息")
-    @Path("/{resourceId}")
-    fun getSystemResource(
-        @ApiParam("资源编码")
-        @PathParam("resourceId")
-        resourceId: String
-    ): Result<ResourceInfo?>
-
-    @GET
-    @ApiOperation("按系统获取资源信息")
-    @Path("/systems/{systemType}")
-    fun getSystemResourceBySystem(
-        @ApiParam("系统")
-        @PathParam("systemType")
-        systemId: SystemType
-    ): Result<List<ResourceInfo>?>
-
-    @GET
-    @ApiOperation("获取所有资源列表")
-    @Path("/")
-    fun listSystemResource(): Result<List<ResourceInfo>?>
 }
