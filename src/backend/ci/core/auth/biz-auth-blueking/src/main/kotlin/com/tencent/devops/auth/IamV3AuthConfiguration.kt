@@ -76,7 +76,7 @@ class IamV3AuthConfiguration {
         systemService: SystemService
     ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
 
-    @Bean
+   /* @Bean
     @ConditionalOnMissingBean(ActionService::class)
     fun ciIamActionService(
         dslContext: DSLContext,
@@ -110,5 +110,5 @@ class IamV3AuthConfiguration {
         iamConfiguration = iamConfiguration,
         iamResourceService = iamResourceService,
         iamSystemService = iamSystemService
-    )
+    )*/
 }

@@ -37,7 +37,6 @@ import com.tencent.bk.sdk.iam.exception.IamException
 import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.bk.sdk.iam.service.SystemService
 import com.tencent.devops.auth.dao.ResourceDao
-import com.tencent.devops.auth.pojo.enum.SystemType
 import com.tencent.devops.auth.pojo.resource.CreateResourceDTO
 import com.tencent.devops.auth.pojo.resource.ResourceInfo
 import com.tencent.devops.auth.pojo.resource.UpdateResourceDTO
@@ -48,8 +47,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import javax.annotation.PostConstruct
 
+@Service
 class IamBkResourceServiceImpl @Autowired constructor(
     override val dslContext: DSLContext,
     override val resourceDao: ResourceDao,
