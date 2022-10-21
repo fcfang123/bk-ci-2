@@ -38,11 +38,12 @@ import com.tencent.bk.sdk.iam.service.impl.ResourceServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.SystemServiceImpl
 import com.tencent.devops.auth.dao.ActionDao
 import com.tencent.devops.auth.dao.ResourceDao
+import com.tencent.devops.auth.service.iam.ActionService
 import com.tencent.devops.auth.service.iam.BkResourceService
 import com.tencent.devops.auth.service.iam.impl.IamBkResourceServiceImpl
 import org.jooq.DSLContext
 import org.springframework.boot.autoconfigure.AutoConfigureOrder
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -76,6 +77,7 @@ class IamV3AuthConfiguration {
     ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
 
     @Bean
+    @ConditionalOnMissingBean(ActionService::class)
     fun ciIamActionService(
         dslContext: DSLContext,
         actionDao: ActionDao,
@@ -95,6 +97,7 @@ class IamV3AuthConfiguration {
     )
 
     @Bean
+    @ConditionalOnMissingBean(BkResourceService::class)
     fun ciIamResourceService(
         dslContext: DSLContext,
         resourceDao: ResourceDao,
