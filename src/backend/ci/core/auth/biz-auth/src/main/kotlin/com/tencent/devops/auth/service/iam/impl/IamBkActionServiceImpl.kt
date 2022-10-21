@@ -71,7 +71,7 @@ class IamBkActionServiceImpl @Autowired constructor(
         // 校验是否存在动作组，若不存在，则actionGroupName、actionGroupEnglishName不能为空
         val isExistActionGroup = validateActionGroup(actionGroups, action)
         // 校验是否存在新建关联，若不存在，则首个action的资源类型必须是project
-        validateResourceCreatorRelation(userId, action)
+        validateResourceCreatorRelation(systemId, action)
         // 1、创建action
         val iamCreateAction = buildAction(action)
         val iamActions = mutableListOf<ActionDTO>()
