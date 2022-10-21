@@ -27,23 +27,13 @@
 
 package com.tencent.devops.auth
 
-import IamBkActionServiceImpl
 import com.tencent.bk.sdk.iam.config.IamConfiguration
-import com.tencent.bk.sdk.iam.service.IamActionService
-import com.tencent.bk.sdk.iam.service.IamResourceService
 import com.tencent.bk.sdk.iam.service.SystemService
 import com.tencent.bk.sdk.iam.service.impl.ActionServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.ApigwHttpClientServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.ResourceServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.SystemServiceImpl
-import com.tencent.devops.auth.dao.ActionDao
-import com.tencent.devops.auth.dao.ResourceDao
-import com.tencent.devops.auth.service.iam.ActionService
-import com.tencent.devops.auth.service.iam.BkResourceService
-import com.tencent.devops.auth.service.iam.impl.IamBkResourceServiceImpl
-import org.jooq.DSLContext
 import org.springframework.boot.autoconfigure.AutoConfigureOrder
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -55,60 +45,60 @@ import org.springframework.core.Ordered
 @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
 //@ConditionalOnProperty(prefix = "auth", name = ["idProvider"], havingValue = "bk_login_v3")
 class IamV3AuthConfiguration {
-
-    @Bean
-    fun iamSystemService(
-        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
-        iamConfiguration: IamConfiguration
-    ) = SystemServiceImpl(apigwHttpClientServiceImpl, iamConfiguration)
-
-    @Bean
-    fun iamActionService(
-        iamConfiguration: IamConfiguration,
-        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
-        systemService: SystemService
-    ) = ActionServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
-
-    @Bean
-    fun iamResourceService(
-        iamConfiguration: IamConfiguration,
-        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
-        systemService: SystemService
-    ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
-
-   /* @Bean
-    @ConditionalOnMissingBean(ActionService::class)
-    fun ciIamActionService(
-        dslContext: DSLContext,
-        actionDao: ActionDao,
-        resourceService: BkResourceService,
-        iamConfiguration: IamConfiguration,
-        systemService: SystemService,
-        iamActionService: IamActionService,
-        iamResourceService: IamResourceService
-    ) = IamBkActionServiceImpl(
-        dslContext = dslContext,
-        actionDao = actionDao,
-        resourceService = resourceService,
-        iamConfiguration = iamConfiguration,
-        systemService = systemService,
-        iamActionService = iamActionService,
-        iamResourceService = iamResourceService
-    )
-
-    @Bean
-    @ConditionalOnMissingBean(BkResourceService::class)
-    fun ciIamResourceService(
-        dslContext: DSLContext,
-        resourceDao: ResourceDao,
-        iamConfiguration: IamConfiguration,
-        iamResourceService: IamResourceService,
-        iamSystemService: SystemService
-    ) = IamBkResourceServiceImpl(
-        dslContext = dslContext,
-        resourceDao = resourceDao,
-        iamConfiguration = iamConfiguration,
-        iamResourceService = iamResourceService,
-        iamSystemService = iamSystemService
-    )*/
+///*
+//    @Bean
+//    fun iamSystemService(
+//        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+//        iamConfiguration: IamConfiguration
+//    ) = SystemServiceImpl(apigwHttpClientServiceImpl, iamConfiguration)
+//
+//    @Bean
+//    fun iamActionService(
+//        iamConfiguration: IamConfiguration,
+//        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+//        systemService: SystemService
+//    ) = ActionServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
+//
+//    @Bean
+//    fun iamResourceService(
+//        iamConfiguration: IamConfiguration,
+//        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+//        systemService: SystemService
+//    ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
+//
+//   *//* @Bean
+//    @ConditionalOnMissingBean(ActionService::class)
+//    fun ciIamActionService(
+//        dslContext: DSLContext,
+//        actionDao: ActionDao,
+//        resourceService: BkResourceService,
+//        iamConfiguration: IamConfiguration,
+//        systemService: SystemService,
+//        iamActionService: IamActionService,
+//        iamResourceService: IamResourceService
+//    ) = IamBkActionServiceImpl(
+//        dslContext = dslContext,
+//        actionDao = actionDao,
+//        resourceService = resourceService,
+//        iamConfiguration = iamConfiguration,
+//        systemService = systemService,
+//        iamActionService = iamActionService,
+//        iamResourceService = iamResourceService
+//    )
+//
+//    @Bean
+//    @ConditionalOnMissingBean(BkResourceService::class)
+//    fun ciIamResourceService(
+//        dslContext: DSLContext,
+//        resourceDao: ResourceDao,
+//        iamConfiguration: IamConfiguration,
+//        iamResourceService: IamResourceService,
+//        iamSystemService: SystemService
+//    ) = IamBkResourceServiceImpl(
+//        dslContext = dslContext,
+//        resourceDao = resourceDao,
+//        iamConfiguration = iamConfiguration,
+//        iamResourceService = iamResourceService,
+//        iamSystemService = iamSystemService
+//    )*/
 }

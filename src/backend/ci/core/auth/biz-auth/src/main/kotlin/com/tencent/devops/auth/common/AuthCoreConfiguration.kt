@@ -29,7 +29,12 @@ package com.tencent.devops.auth.common
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tencent.bk.sdk.iam.config.IamConfiguration
+import com.tencent.bk.sdk.iam.service.SystemService
+import com.tencent.bk.sdk.iam.service.impl.ActionServiceImpl
+import com.tencent.bk.sdk.iam.service.impl.ApigwHttpClientServiceImpl
 import com.tencent.bk.sdk.iam.service.impl.GrantServiceImpl
+import com.tencent.bk.sdk.iam.service.impl.ResourceServiceImpl
+import com.tencent.bk.sdk.iam.service.impl.SystemServiceImpl
 import com.tencent.devops.auth.filter.BlackListAspect
 import com.tencent.devops.auth.filter.TokenCheckFilter
 import com.tencent.devops.auth.refresh.dispatch.AuthRefreshDispatch
@@ -206,18 +211,23 @@ class AuthCoreConfiguration {
     @ConditionalOnMissingBean(OrganizationService::class)
     fun sampleOrganizationService() = SampleOrganizationService()
 
-    /*//@Bean
-    //@ConditionalOnMissingBean(ActionService::class)
-    fun simpleActionService(
-        dslContext: DSLContext,
-        actionDao: ActionDao,
-        resourceService: BkResourceService
-    ) = SimpleBkActionServiceImpl(dslContext, actionDao, resourceService)*/
+    @Bean
+    fun iamSystemService(
+        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+        iamConfiguration: IamConfiguration
+    ) = SystemServiceImpl(apigwHttpClientServiceImpl, iamConfiguration)
 
-    /*@Bean
-    @ConditionalOnMissingBean(BkResourceService::class)
-    fun simpleResourceService(
-        dslContext: DSLContext,
-        resourceDao: ResourceDao
-    ) = SimpleBkResourceServiceImpl(dslContext, resourceDao)*/
+    @Bean
+    fun iamActionService(
+        iamConfiguration: IamConfiguration,
+        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+        systemService: SystemService
+    ) = ActionServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
+
+    @Bean
+    fun iamResourceService(
+        iamConfiguration: IamConfiguration,
+        apigwHttpClientServiceImpl: ApigwHttpClientServiceImpl,
+        systemService: SystemService
+    ) = ResourceServiceImpl(iamConfiguration, apigwHttpClientServiceImpl, systemService)
 }
