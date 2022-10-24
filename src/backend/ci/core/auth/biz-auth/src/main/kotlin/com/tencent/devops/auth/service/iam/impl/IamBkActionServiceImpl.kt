@@ -271,7 +271,7 @@ class IamBkActionServiceImpl @Autowired constructor(
             }
         }
         logger.info("newActionGroups : $actionGroups")
-        iamActionService.updateActionGroup(actionGroups)
+        iamActionService.createActionGroup(actionGroups)
     }
 
     private fun buildAction(action: CreateActionDTO): ActionDTO {
