@@ -30,7 +30,7 @@ package com.tencent.devops.monitoring.service
 import com.tencent.devops.common.api.constant.CommonMessageCode
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.pojo.ErrorType
-import com.tencent.devops.monitoring.client.InfluxdbClient
+import com.tencent.devops.monitoring.client.MonitoringInfluxdbClient
 import com.tencent.devops.monitoring.pojo.AtomMonitorFailDetailData
 import com.tencent.devops.monitoring.pojo.AtomMonitorStatisticData
 import org.influxdb.dto.QueryResult
@@ -41,7 +41,7 @@ import javax.ws.rs.core.Response
 
 @Service
 class AtomMonitorService @Autowired constructor(
-    private val influxdbClient: InfluxdbClient
+    private val monitoringInfluxdbClient: MonitoringInfluxdbClient
 ) {
 
     /**
@@ -84,7 +84,7 @@ class AtomMonitorService @Autowired constructor(
 
     private fun getNum(sql: String): Int {
         val num: Int
-        val queryResult = influxdbClient.select(sql)
+        val queryResult = monitoringInfluxdbClient.select(sql)
         if (null != queryResult && !queryResult.hasError()) {
             num = getNumFromResult(queryResult)
         } else {
