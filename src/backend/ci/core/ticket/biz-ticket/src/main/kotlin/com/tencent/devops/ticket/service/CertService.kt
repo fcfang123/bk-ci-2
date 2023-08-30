@@ -200,10 +200,7 @@ interface CertService {
 
     fun queryTlsByProject(projectId: String, certId: String, publicKey: String): CertTls
 
-    fun getCertByIds(
-        projectId: String? = null,
-        certIds: Set<String>
-    ): List<Cert>?
+    fun getCertByIds(certIds: Set<String>): List<Cert>?
 
     fun searchByCertId(
         projectId: String,

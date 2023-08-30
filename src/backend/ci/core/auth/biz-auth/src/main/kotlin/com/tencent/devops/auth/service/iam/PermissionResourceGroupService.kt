@@ -99,12 +99,4 @@ interface PermissionResourceGroupService {
         groupId: Int,
         renameGroupDTO: RenameGroupDTO
     ): Boolean
-
-    fun addGroupMember(
-        userId: String,
-        /*user 或 department*/
-        memberType: String,
-        expiredAt: Long,
-        groupId: Int
-    ): Boolean
 }
