@@ -68,12 +68,14 @@ import com.tencent.devops.project.jmx.api.ProjectJmxApi
 import com.tencent.devops.project.jmx.api.ProjectJmxApi.Companion.PROJECT_LIST
 import com.tencent.devops.project.pojo.AuthProjectCreateInfo
 import com.tencent.devops.project.pojo.ProjectBaseInfo
+import com.tencent.devops.project.pojo.ProjectCollation
 import com.tencent.devops.project.pojo.ProjectCreateExtInfo
 import com.tencent.devops.project.pojo.ProjectCreateInfo
 import com.tencent.devops.project.pojo.ProjectDiffVO
 import com.tencent.devops.project.pojo.ProjectLogo
 import com.tencent.devops.project.pojo.ProjectOrganizationInfo
 import com.tencent.devops.project.pojo.ProjectProperties
+import com.tencent.devops.project.pojo.ProjectSortType
 import com.tencent.devops.project.pojo.ProjectUpdateCreatorDTO
 import com.tencent.devops.project.pojo.ProjectUpdateInfo
 import com.tencent.devops.project.pojo.ProjectVO
@@ -636,7 +638,9 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
         userId: String,
         accessToken: String?,
         enabled: Boolean?,
-        unApproved: Boolean
+        unApproved: Boolean,
+        sortType: ProjectSortType?,
+        collation: ProjectCollation?
     ): List<ProjectVO> {
         val startEpoch = System.currentTimeMillis()
         var success = false
@@ -673,7 +677,9 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                 projectDao.listByEnglishName(
                     dslContext = dslContext,
                     englishNameList = projectsWithVisitPermission.toList(),
-                    enabled = enabled
+                    enabled = enabled,
+                    sortType = sortType,
+                    collation = collation
                 ).forEach {
                     val pipelineTemplateInstallPerm = pipelineTemplateInstallPerm(
                         projectsWithPipelineTemplateCreatePerm = projectsWithPipelineTemplateCreatePerm,
@@ -697,6 +703,7 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                     userId = userId
                 ).forEach {
                     projectsResp.add(
+                        0,
                         ProjectUtils.packagingBean(
                             tProjectRecord = it,
                             managePermission = true,
