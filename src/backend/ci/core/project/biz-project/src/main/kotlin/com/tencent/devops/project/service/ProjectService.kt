@@ -169,8 +169,8 @@ interface ProjectService {
         accessToken: String?,
         enabled: Boolean? = null,
         unApproved: Boolean,
-        sortType: ProjectSortType?,
-        collation: ProjectCollation?
+        sortType: ProjectSortType? = null,
+        collation: ProjectCollation? = null
     ): List<ProjectVO>
 
     fun listProjectsForApply(
