@@ -232,6 +232,11 @@ class SimpleProjectServiceImpl @Autowired constructor(
 
     override fun updateProjectRouterTag(englishName: String) = Unit
 
+    override fun validateProjectRelateProduct(
+        enabled: Boolean,
+        productId: Int?
+    ) = Unit
+
     companion object {
         private val logger = LoggerFactory.getLogger(SimpleProjectServiceImpl::class.java)
     }

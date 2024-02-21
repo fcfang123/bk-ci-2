@@ -1065,6 +1065,10 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                     I18nUtil.getCodeLanMessage(ProjectMessageCode.PEM_CHECK_FAIL)
                 )
             }
+            validateProjectRelateProduct(
+                enabled = enabled,
+                productId = projectInfo.productId
+            )
         }
         projectDao.updateUsableStatus(
             dslContext = dslContext,
@@ -1359,6 +1363,11 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
     private fun getAllMembersName() = I18nUtil.getCodeLanMessage(ALL_MEMBERS_NAME)
 
     abstract fun buildRouterTag(routerTag: String?): String?
+
+    abstract fun validateProjectRelateProduct(
+        enabled: Boolean,
+        productId: Int?
+    )
 
     companion object {
         const val MAX_PROJECT_NAME_LENGTH = 64
