@@ -17,6 +17,7 @@ import javax.ws.rs.DELETE
 import javax.ws.rs.GET
 import javax.ws.rs.HeaderParam
 import javax.ws.rs.POST
+import javax.ws.rs.PUT
 import javax.ws.rs.Path
 import javax.ws.rs.PathParam
 import javax.ws.rs.Produces
@@ -124,5 +125,29 @@ interface ApigwAuthProjectResourceV4 {
         projectId: String,
         @ApiParam("删除信息", required = true)
         deleteInfo: ProjectDeleteUserInfo
+    ): Result<Boolean>
+
+    @PUT
+    @Path("/update_project_product")
+    @ApiOperation(
+        "更新项目关联产品",
+        tags = ["v4_app_update_project_product", "v4_user_update_project_product"]
+    )
+    fun updateProjectProductId(
+        @ApiParam(value = "appCode", required = true, defaultValue = AUTH_HEADER_DEVOPS_APP_CODE_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_DEVOPS_APP_CODE)
+        appCode: String?,
+        @ApiParam(value = "apigw Type", required = true)
+        @PathParam("apigwType")
+        apigwType: String?,
+        @ApiParam("userId")
+        @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
+        userId: String?,
+        @ApiParam(value = "项目code", required = true)
+        @PathParam("projectId")
+        projectId: String,
+        @ApiParam("产品名称", required = true)
+        @QueryParam("productName")
+        productName: String
     ): Result<Boolean>
 }
