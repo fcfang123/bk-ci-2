@@ -703,7 +703,6 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                     userId = userId
                 ).forEach {
                     projectsResp.add(
-                        0,
                         ProjectUtils.packagingBean(
                             tProjectRecord = it,
                             managePermission = true,
