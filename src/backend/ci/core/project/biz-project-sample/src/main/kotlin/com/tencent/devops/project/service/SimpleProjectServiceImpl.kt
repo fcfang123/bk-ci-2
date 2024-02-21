@@ -233,6 +233,7 @@ class SimpleProjectServiceImpl @Autowired constructor(
     override fun updateProjectRouterTag(englishName: String) = Unit
 
     override fun validateProjectRelateProduct(
+        userId: String,
         enabled: Boolean,
         productId: Int?
     ) = Unit

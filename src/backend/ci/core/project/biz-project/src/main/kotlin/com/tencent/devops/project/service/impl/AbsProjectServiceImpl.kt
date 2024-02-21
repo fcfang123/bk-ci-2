@@ -1066,6 +1066,7 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                 )
             }
             validateProjectRelateProduct(
+                userId = userId,
                 enabled = enabled,
                 productId = projectInfo.productId
             )
@@ -1365,6 +1366,7 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
     abstract fun buildRouterTag(routerTag: String?): String?
 
     abstract fun validateProjectRelateProduct(
+        userId: String,
         enabled: Boolean,
         productId: Int?
     )
