@@ -256,7 +256,8 @@ interface ProjectService {
 
     fun updateProjectProductId(
         englishName: String,
-        productName: String
+        productName: String? = null,
+        productId: Int? = null
     )
 
     fun updateOrganizationByEnglishName(

@@ -1280,16 +1280,26 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
 
     override fun updateProjectProductId(
         englishName: String,
-        productName: String
+        productName: String?,
+        productId: Int?
     ) {
         logger.info("update project productId|$englishName|$productName")
+        if (productId == null && productName == null) {
+            throw NotFoundException("productName or productId must not be null")
+        }
         projectDao.getByEnglishName(
             dslContext = dslContext,
             englishName = englishName
         ) ?: throw NotFoundException("project - $englishName is not exist!")
-        val product = getOperationalProducts().firstOrNull {
-            it.productName == productName
-        } ?: throw NotFoundException("product - $productName is not exist!")
+        val product = if (productId != null) {
+            getOperationalProducts().firstOrNull {
+                it.productId == productId
+            }
+        } else {
+            getOperationalProducts().firstOrNull {
+                it.productName == productName
+            }
+        } ?: throw NotFoundException("product is not exist!")
         projectDao.updateProductId(
             dslContext = dslContext,
             englishName = englishName,

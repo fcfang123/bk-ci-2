@@ -148,6 +148,9 @@ interface ApigwAuthProjectResourceV4 {
         projectId: String,
         @ApiParam("产品名称", required = true)
         @QueryParam("productName")
-        productName: String
+        productName: String? = null,
+        @ApiParam("产品Id", required = true)
+        @QueryParam("productId")
+        productId: Int? = null
     ): Result<Boolean>
 }

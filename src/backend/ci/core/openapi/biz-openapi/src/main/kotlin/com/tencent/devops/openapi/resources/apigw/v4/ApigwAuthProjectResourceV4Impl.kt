@@ -94,13 +94,15 @@ class ApigwAuthProjectResourceV4Impl @Autowired constructor(
         apigwType: String?,
         userId: String?,
         projectId: String,
-        productName: String
+        productName: String?,
+        productId: Int?
     ): Result<Boolean> {
         logger.info("updateProjectProductId v4 |$appCode|$userId|$projectId|$productName")
         openapiPermissionService.validProjectManagerPermission(appCode, apigwType, userId, projectId)
         val response = client.get(ServiceProjectResource::class).updateProjectProductId(
             projectCode = projectId,
-            productName = productName
+            productName = productName,
+            productId = productId
         )
         return with(response) {
             Result(
