@@ -73,8 +73,8 @@ class UserProjectResourceImpl @Autowired constructor(
                 accessToken = accessToken,
                 enabled = enabled,
                 unApproved = unApproved ?: false,
-                sortType = sortType,
-                collation = collation
+                sortType = sortType ?: ProjectSortType.PROJECT_NAME,
+                collation = collation ?: ProjectCollation.DEFAULT
             )
         )
     }

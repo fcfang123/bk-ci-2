@@ -84,12 +84,12 @@ interface UserProjectResource {
         @Parameter(description = "是否拉取未审批通过的项目，若为true，会拉取审批[未通过+通过]的项目", required = false)
         @QueryParam("unApproved")
         unApproved: Boolean?,
-        @ApiParam("项目排序", required = false, defaultValue = "PROJECT_NAME")
+        @Parameter(description = "项目排序", required = false, example = "PROJECT_NAME")
         @QueryParam("sortType")
-        sortType: ProjectSortType? = ProjectSortType.PROJECT_NAME,
-        @ApiParam("排序规则", required = false)
+        sortType: ProjectSortType?,
+        @Parameter(description = "排序规则", required = false)
         @QueryParam("collation")
-        collation: ProjectCollation? = ProjectCollation.DEFAULT
+        collation: ProjectCollation?
     ): Result<List<ProjectVO>>
 
     @GET

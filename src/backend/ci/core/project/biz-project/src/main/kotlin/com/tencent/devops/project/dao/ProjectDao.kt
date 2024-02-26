@@ -591,9 +591,9 @@ class ProjectDao {
                         when (sortType) {
                             ProjectSortType.PROJECT_NAME -> {
                                 if (collation == ProjectCollation.DEFAULT || collation == ProjectCollation.ASC) {
-                                    it.orderBy(PROJECT_NAME.asc())
+                                    it.orderBy(DSL.field("CONVERT({0} USING GBK)", PROJECT_NAME).asc())
                                 } else {
-                                    it.orderBy(PROJECT_NAME.desc())
+                                    it.orderBy(DSL.field("CONVERT({0} USING GBK)", PROJECT_NAME).desc())
                                 }
                             }
                             ProjectSortType.ENGLISH_NAME -> {
