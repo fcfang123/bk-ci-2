@@ -63,6 +63,7 @@ import com.tencent.devops.project.constant.ProjectMessageCode.BOUND_IAM_GRADIENT
 import com.tencent.devops.project.constant.ProjectMessageCode.PROJECT_NOT_EXIST
 import com.tencent.devops.project.constant.ProjectMessageCode.UNDER_APPROVAL_PROJECT
 import com.tencent.devops.project.dao.ProjectDao
+import com.tencent.devops.project.dao.ProjectUpdateHistoryDao
 import com.tencent.devops.project.dispatch.ProjectDispatcher
 import com.tencent.devops.project.jmx.api.ProjectJmxApi
 import com.tencent.devops.project.jmx.api.ProjectJmxApi.Companion.PROJECT_LIST
@@ -75,6 +76,7 @@ import com.tencent.devops.project.pojo.ProjectLogo
 import com.tencent.devops.project.pojo.ProjectOrganizationInfo
 import com.tencent.devops.project.pojo.ProjectProperties
 import com.tencent.devops.project.pojo.ProjectUpdateCreatorDTO
+import com.tencent.devops.project.pojo.ProjectUpdateHistoryInfo
 import com.tencent.devops.project.pojo.ProjectUpdateInfo
 import com.tencent.devops.project.pojo.ProjectVO
 import com.tencent.devops.project.pojo.ProjectWithPermission
@@ -121,7 +123,8 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
     private val projectExtService: ProjectExtService,
     private val projectApprovalService: ProjectApprovalService,
     private val clientTokenService: ClientTokenService,
-    private val profile: Profile
+    private val profile: Profile,
+    private val projectUpdateHistoryDao: ProjectUpdateHistoryDao
 ) : ProjectService {
 
     override fun validate(validateType: ProjectValidateType, name: String, projectId: String?) {
@@ -358,14 +361,6 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
         return projectVO
     }
 
-    override fun getByEnglishNameWithoutPerm(englishName: String): ProjectVO? {
-        val record = projectDao.getByEnglishName(
-            dslContext = dslContext,
-            englishName = englishName
-        ) ?: return null
-        return ProjectUtils.packagingBean(record)
-    }
-
     override fun show(userId: String, englishName: String, accessToken: String?): ProjectVO? {
         val record = projectDao.getByEnglishName(dslContext, englishName) ?: return null
         val rightProjectOrganization = fixProjectOrganization(tProjectRecord = record)
@@ -532,6 +527,24 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                         }
                     }
                 }
+                // 记录项目更新记录
+                val projectUpdateHistoryInfo = ProjectUpdateHistoryInfo(
+                    englishName = englishName,
+                    beforeProjectName = projectInfo.projectName,
+                    afterProjectName = projectUpdateInfo.projectName,
+                    beforeProductId = projectInfo.productId,
+                    afterProductId = projectUpdateInfo.productId,
+                    beforeOrganization = with(projectInfo) { getOrganizationStr(bgName, businessLineName, deptName, centerName) },
+                    afterOrganization = with(projectUpdateInfo) { getOrganizationStr(bgName, businessLineName, deptName, centerName) },
+                    beforeSubjectScopes = projectInfo.subjectScopes,
+                    afterSubjectScopes = subjectScopesStr,
+                    operator = userId,
+                    approvalStatus = newApprovalStatus
+                )
+                projectUpdateHistoryDao.createOrUpdate(
+                    dslContext = dslContext,
+                    projectUpdateHistoryInfo = projectUpdateHistoryInfo
+                )
                 if (!projectUpdateInfo.secrecy) {
                     redisOperation.removeSetMember(SECRECY_PROJECT_REDIS_KEY, projectUpdateInfo.englishName)
                 } else {
@@ -554,6 +567,17 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
             projectJmxApi.execute(ProjectJmxApi.PROJECT_UPDATE, System.currentTimeMillis() - startEpoch, success)
         }
         return success
+    }
+
+    private fun getOrganizationStr(
+        bgName: String?,
+        businessLineName: String?,
+        deptName: String?,
+        centerName: String?
+    ): String {
+        return listOf(
+            bgName, businessLineName, deptName, centerName
+        ).filter { !it.isNullOrBlank() }.joinToString("-")
     }
 
     /**
@@ -880,7 +904,8 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
                 projectName = it.projectName,
                 englishName = it.englishName,
                 permission = true,
-                routerTag = buildRouterTag(it.routerTag)
+                routerTag = buildRouterTag(it.routerTag),
+                bgId = it.bgId
             )
         }
     }
