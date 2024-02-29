@@ -464,7 +464,7 @@ abstract class AbsProjectServiceImpl @Autowired constructor(
             return list
         } finally {
             projectJmxApi.execute(PROJECT_LIST, System.currentTimeMillis() - startEpoch, success)
-            logger.info("It took ${System.currentTimeMillis() - startEpoch}ms to list projects")
+            logger.info("It took    ${System.currentTimeMillis() - startEpoch}ms to list projects")
         }
     }
 
