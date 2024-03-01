@@ -175,7 +175,7 @@ interface UserProjectResource {
 
     @PUT
     @Path("/{validateType}/names/validate")
-    @ApiOperation("校验项目名称和项目英文名")
+    @ApiOperation("校验项目名称和项目  英文名")
     fun validate(
         @ApiParam("userId", required = true)
         @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
