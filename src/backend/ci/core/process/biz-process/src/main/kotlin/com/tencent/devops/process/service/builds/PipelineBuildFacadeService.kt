@@ -63,8 +63,8 @@ import com.tencent.devops.common.pipeline.pojo.element.trigger.ManualTriggerElem
 import com.tencent.devops.common.pipeline.pojo.element.trigger.RemoteTriggerElement
 import com.tencent.devops.common.pipeline.utils.BuildStatusSwitcher
 import com.tencent.devops.common.redis.RedisOperation
-import com.tencent.devops.common.service.utils.CommonUtils
 import com.tencent.devops.common.service.utils.HomeHostUtil
+import com.tencent.devops.common.service.utils.SpringContextUtil
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.process.constant.ProcessMessageCode
 import com.tencent.devops.process.constant.ProcessMessageCode.BK_BUILD_HISTORY
@@ -133,6 +133,7 @@ import com.tencent.devops.process.utils.PIPELINE_RETRY_START_TASK_ID
 import com.tencent.devops.process.utils.PIPELINE_SKIP_FAILED_TASK
 import com.tencent.devops.process.utils.PIPELINE_START_TASK_ID
 import com.tencent.devops.quality.api.v2.pojo.ControlPointPosition
+import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -169,7 +170,8 @@ class PipelineBuildFacadeService(
     private val buildParamCompatibilityTransformer: BuildParametersCompatibilityTransformer,
     private val pipelineRedisService: PipelineRedisService,
     private val pipelineRetryFacadeService: PipelineRetryFacadeService,
-    private val webhookBuildParameterService: WebhookBuildParameterService
+    private val webhookBuildParameterService: WebhookBuildParameterService,
+    private val dslContext: DSLContext
 ) {
 
     @Value("\${pipeline.build.cancel.intervalLimitTime:60}")
@@ -341,7 +343,7 @@ class PipelineBuildFacadeService(
             pipelineId = pipelineId,
             permission = AuthPermission.VIEW
         )
-        val queryDslContext = CommonUtils.getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
+        val queryDslContext = getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
         return pipelineRuntimeService.getBuildParametersFromStartup(projectId, buildId, queryDslContext)
     }
 
@@ -1422,7 +1424,7 @@ class PipelineBuildFacadeService(
         channelCode: ChannelCode,
         archiveFlag: Boolean? = false
     ): ModelRecord {
-        val queryDslContext = CommonUtils.getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
+        val queryDslContext = getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
         val buildInfo = pipelineRuntimeService.getBuildInfo(
             projectId = projectId,
             buildId = buildId,
@@ -1849,7 +1851,7 @@ class PipelineBuildFacadeService(
         val limit = sqlLimit?.limit ?: 1000
 
         val channelCode = if (projectId.startsWith("git_")) ChannelCode.GIT else ChannelCode.BS
-        val queryDslContext = CommonUtils.getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
+        val queryDslContext = getJooqDslContext(archiveFlag, ARCHIVE_SHARDING_DSL_CONTEXT)
         val pipelineInfo = pipelineRepositoryService.getPipelineInfo(
             projectId = projectId,
             pipelineId = pipelineId,
@@ -2567,6 +2569,17 @@ class PipelineBuildFacadeService(
                 return@forEach
             }
             checkManualReviewParamOut(item.valueType, item, value)
+        }
+    }
+
+    private fun getJooqDslContext(archiveFlag: Boolean? = null, archiveDslContextName: String? = null): DSLContext {
+        return if (archiveFlag == true) {
+            if (archiveDslContextName.isNullOrBlank()) {
+                throw ErrorCodeException(errorCode = CommonMessageCode.SYSTEM_ERROR)
+            }
+            SpringContextUtil.getBean(DSLContext::class.java, archiveDslContextName)
+        } else {
+            dslContext
         }
     }
 }
