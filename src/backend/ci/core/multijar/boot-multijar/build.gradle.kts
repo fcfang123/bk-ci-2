@@ -32,6 +32,7 @@ dependencies {
     api("mysql:mysql-connector-java")
     api("com.tencent.devops.leaf:leaf-boot-starter")
     implementation(kotlin("stdlib"))
+    api("org.testcontainers:testcontainers")
 }
 plugins {
     `task-render-template`

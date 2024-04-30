@@ -30,10 +30,15 @@ import java.util.Properties
 
 tasks.register<BootRun>("multiBootRun") {
     doFirst {
+        val sqlFilePath = joinPath(
+            rootDir.absolutePath.replace("${File.separator}src${File.separator}backend${File.separator}ci", ""),
+            "support-files",
+            "i18n"
+        )
         systemProperty("devops.multi.from", localRunMultiServices)
         systemProperty("spring.datasource.url", System.getProperty("mysqlURL"))
         systemProperty("spring.datasource.username", System.getProperty("mysqlUser"))
-        systemProperty("spring.datasource.password",  System.getProperty("mysqlPasswd"))
+        systemProperty("spring.datasource.password", System.getProperty("mysqlPasswd"))
         systemProperty("spring.main.allow-circular-references", "true")
         systemProperty("spring.cloud.config.enabled", "false")
         systemProperty("spring.cloud.config.fail-fast", "true")
@@ -46,6 +51,8 @@ tasks.register<BootRun>("multiBootRun") {
         systemProperty("server.port", "8081")
         systemProperty("local.run", "true")
         systemProperty("service.log.dir", joinPath(projectDir.absolutePath, "log"))
+        systemProperty("workspace.dir", rootProject.projectDir)
+        systemProperty("sql.file.dir", sqlFilePath)
     }
     dependsOn("multiBootJar")
     val bootJarTask = tasks.getByName<BootJar>("bootJar")

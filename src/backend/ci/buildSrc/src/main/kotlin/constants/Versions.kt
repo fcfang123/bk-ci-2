@@ -53,4 +53,5 @@ object Versions {
     const val MysqlDriver = "8.0.33"
     const val swagger = "2.2.16"
     const val jakarta = "2.1.2"
+    const val testcontainers="1.19.1"
 }
