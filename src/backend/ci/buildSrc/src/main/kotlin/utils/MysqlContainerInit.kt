@@ -4,7 +4,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.images.builder.ImageFromDockerfile
 import java.nio.file.Paths
 
-class MysqlContainerInit {
+object MysqlContainerInit {
     fun initMysqlContainer() {
         val path = Paths.get("C:\\Users\\bk-ci-2\\support-files\\Dockerfile")
         val mysqlContainer = GenericContainer<GenericContainer<*>>(

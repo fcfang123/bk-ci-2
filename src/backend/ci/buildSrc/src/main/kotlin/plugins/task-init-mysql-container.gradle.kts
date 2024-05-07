@@ -25,20 +25,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-dependencies {
-    api(project(":core:common:common-web"))
-    api(project(":core:common:common-db-base"))
-    api(project(":core:common:common-util"))
-    api("mysql:mysql-connector-java")
-    api("com.tencent.devops.leaf:leaf-boot-starter")
-    implementation(kotlin("stdlib"))
-    api("org.testcontainers:testcontainers")
-}
-plugins {
-    `task-render-template`
-    `task-multi-boot-jar`
-    `task-multi-boot-run`
-    `task-init-mysql-container`
-}
+import utils.MysqlContainerInit
 
-tasks.getByName("multiBootRun").dependsOn("replacePlaceholders")
+tasks.register("initMysqlContainer") {
+    MysqlContainerInit.initMysqlContainer()
+}
