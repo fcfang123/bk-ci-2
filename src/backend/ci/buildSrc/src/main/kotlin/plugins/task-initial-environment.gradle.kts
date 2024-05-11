@@ -24,9 +24,20 @@
  * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+import utils.EnvironmentInitializationUtil
 
-import utils.MysqlContainerInit
-
-tasks.register("initMysqlContainer") {
-    MysqlContainerInit.initMysqlContainer()
+tasks.register("initialEnvironment") {
+    doLast {
+        EnvironmentInitializationUtil.initialEnvironment(getMysqlInitDockerFileDir())
+    }
 }
+
+fun getMysqlInitDockerFileDir(): String {
+    val rootDirPath = rootDir.absolutePath.replace(
+        "${File.separator}src${File.separator}backend${File.separator}ci",
+        ""
+    )
+    return joinPath(rootDirPath, "support-files", "sql", "Dockerfile")
+}
+
+fun joinPath(vararg folders: String) = folders.joinToString(File.separator)

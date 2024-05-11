@@ -26,6 +26,7 @@
  */
 import nu.studer.gradle.jooq.JooqGenerate
 import utils.DatabaseUtil
+import utils.EnvironmentInitializationUtil
 import utils.ModuleUtil
 
 plugins {
@@ -49,7 +50,7 @@ jooq {
             val databaseName = DatabaseUtil.getDatabaseName(moduleName, project.extra["DB_PREFIX"].toString())
 
             val specialModule = moduleNames.size != 1
-            val taskName = if (specialModule) "${moduleName}Genenrate" else "genenrate"
+            val taskName = if (specialModule) "${moduleName}Generate" else "generate"
 
             project.the<SourceSetContainer>()["main"].java {
                 srcDir("build/generated-src/jooq/$taskName")

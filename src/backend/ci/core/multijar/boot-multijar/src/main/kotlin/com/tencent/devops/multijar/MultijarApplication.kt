@@ -31,7 +31,6 @@ import com.tencent.devops.common.service.MicroService
 import com.tencent.devops.common.service.MicroServiceApplication
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.FilterType
-import org.testcontainers.containers.FixedHostPortGenericContainer
 
 @MicroService
 @ComponentScan(
@@ -46,31 +45,5 @@ import org.testcontainers.containers.FixedHostPortGenericContainer
 class MultijarApplication
 
 fun main(args: Array<String>) {
-    val redis = FixedHostPortGenericContainer("redis:5.0.3-alpine")
-        .withFixedExposedPort(30002, 6379)
-    redis.start()
-    // 创建Elasticsearch容器
-    val elasticsearchContainer = FixedHostPortGenericContainer(
-        "docker.elastic.co/elasticsearch/elasticsearch:7.14.0"
-    ).withFixedExposedPort(30014, 9200)
-        .withFixedExposedPort(30015, 9300)
-        .withEnv("discovery.type", "single-node")
-        .withEnv("xpack.security.enabled", "false")
-        .withEnv("ELASTIC_PASSWORD", "blueking")
-    // 启动容器
-    elasticsearchContainer.start()
-    val influxDBContainer = FixedHostPortGenericContainer(
-        "docker.io/bitnami/influxdb:1.8.3-debian-10-r88"
-    ).withFixedExposedPort(30006, 8086)
-        .withEnv("INFLUXDB_ADMIN_USER_PASSWORD", "blueking")
-    influxDBContainer.start()
-
-    val rabbitmq = FixedHostPortGenericContainer("heidiks/rabbitmq-delayed-message-exchange:3.13.0-management")
-        .withFixedExposedPort(30003, 5672)
-        .withFixedExposedPort(15672, 15672)
-        .withEnv("RABBITMQ_DEFAULT_USER", "admin")
-        .withEnv("RABBITMQ_DEFAULT_PASS", "blueking")
-    rabbitmq.start()
-
     MicroServiceApplication.run(MultijarApplication::class, args)
 }

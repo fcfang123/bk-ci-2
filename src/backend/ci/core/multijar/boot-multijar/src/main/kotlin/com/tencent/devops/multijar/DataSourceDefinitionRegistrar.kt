@@ -57,7 +57,8 @@ class DataSourceDefinitionRegistrar : ImportBeanDefinitionRegistrar {
     fun getModuleJdbcUrl(moduleName: String): String {
         return "jdbc:mysql://$dataSourceUrl/devops_ci_$moduleName?useSSL=false&autoReconnect=true&" +
             "serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf8" +
-            "&allowMultiQueries=true&sessionVariables=sql_mode=%27STRICT_TRANS_TABLES," +
+            "&allowPublicKeyRetrieval=true&allowMultiQueries=true" +
+            "&sessionVariables=sql_mode=%27STRICT_TRANS_TABLES," +
             "NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION%27"
     }
 

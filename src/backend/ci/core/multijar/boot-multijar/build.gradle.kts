@@ -24,6 +24,8 @@
  * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+import org.testcontainers.dockerclient.DockerClientProviderStrategy
+import java.lang.reflect.Field
 
 dependencies {
     api(project(":core:common:common-web"))
@@ -38,7 +40,10 @@ plugins {
     `task-render-template`
     `task-multi-boot-jar`
     `task-multi-boot-run`
-    `task-init-mysql-container`
+    `task-initial-environment`
 }
 
-tasks.getByName("multiBootRun").dependsOn("replacePlaceholders")
+val failFastAlwaysField: Field = DockerClientProviderStrategy::class.java.getDeclaredField("FAIL_FAST_ALWAYS")
+failFastAlwaysField.isAccessible = true
+val failFastAlways = failFastAlwaysField.get(null) as java.util.concurrent.atomic.AtomicBoolean
+failFastAlways.set(false)

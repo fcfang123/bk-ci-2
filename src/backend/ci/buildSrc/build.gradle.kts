@@ -26,5 +26,5 @@ dependencies {
     implementation("com.github.jk1:gradle-license-report:1.17") // 2.x need gradle-7.0
     implementation("com.mysql:mysql-connector-j:8.0.33")
     implementation("org.testcontainers:testcontainers:1.19.1")
-    implementation("org.testcontainers:mysql:1.19.1")
+    implementation("com.github.docker-java:docker-java:3.2.5")
 }
