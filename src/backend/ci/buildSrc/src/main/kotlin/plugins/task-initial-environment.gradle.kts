@@ -30,6 +30,7 @@ tasks.register("initialEnvironment") {
     doLast {
         EnvironmentInitializationUtil.initialEnvironment(getMysqlInitDockerFileDir())
     }
+    outputs.upToDateWhen { false }
 }
 
 fun getMysqlInitDockerFileDir(): String {
