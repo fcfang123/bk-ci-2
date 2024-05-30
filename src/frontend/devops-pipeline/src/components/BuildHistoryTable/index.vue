@@ -109,6 +109,7 @@
                         <stage-steps
                             v-if="props.row.stageStatus"
                             :steps="props.row.stageStatus"
+                            :build-id="props.row.id"
                         ></stage-steps>
                         <span v-else>--</span>
                     </template>
@@ -429,7 +430,7 @@
         errorTypeMap,
         extForFile
     } from '@/utils/pipelineConst'
-    import { convertFileSize, convertMStoString, convertTime, getQueryParamString } from '@/utils/util'
+    import { convertFileSize, convertMStoString, convertTime, flatSearchKey } from '@/utils/util'
     import webSocketMessage from '@/utils/webSocketMessage'
     import { mapActions, mapGetters, mapState } from 'vuex'
 
@@ -471,9 +472,7 @@
                 buildHistories: [],
                 stoping: {},
                 isLoading: false,
-                tableColumnKeys: initSortedColumns,
-                pipelineChanged: false,
-                initedVersion: false
+                tableColumnKeys: initSortedColumns
             }
         },
         computed: {
@@ -499,7 +498,7 @@
                 return this.$route.params.pipelineId
             },
             routePipelineVersion () {
-                return this.$route.params.version ? parseInt(this.$route.params.version) : ''
+                return this.$route.params.version ? parseInt(this.$route.params.version) : this.pipelineInfo?.releaseVersion
             },
             canEdit () {
                 return this.pipelineInfo?.permissions.canEdit ?? true
@@ -641,40 +640,52 @@
             },
             currentBuildId () {
                 return this.activeBuild.id
+            },
+            historyQuerys () {
+                const { historyPageStatus: { query, searchKey, page, pageSize } } = this
+                return {
+                    query,
+                    searchKey,
+                    page,
+                    pageSize
+                }
             }
         },
         watch: {
-            activePipelineVersion: {
-                deep: true,
-                handler (newVal, oldVal) {
-                    if (this.pipelineChanged || !this.initedVersion || (newVal?.version !== this.routePipelineVersion)) {
-                        this.pipelineChanged = false
-                        this.initedVersion = true
-                        this.handlePageChange(1)
-                    }
+            'activePipelineVersion.version' (newVersion) {
+                if ((newVersion !== this.routePipelineVersion)) {
+                    this.handlePageChange(1)
                 }
             },
-            pipelineId () {
-                this.pipelineChanged = true
+            historyQuerys: {
+                handler (val) {
+                    const { query, searchKey, page, pageSize } = val
+                    const queryMap = new URLSearchParams({
+                        page,
+                        pageSize,
+                        ...query,
+                        ...flatSearchKey(searchKey)
+                    })
+                    this.$router.push({
+                        query: Object.fromEntries(queryMap.entries())
+                    })
+                },
+                deep: true
             }
         },
         created () {
-            if (location.search) { // 路径上带有参数，需要将参数传递给store
+            if (this.$route.query) {
                 this.setHistoryPageStatus({
-                    queryStr: getQueryParamString(this.$route.query),
-                    query: {
-                        ...(this.historyPageStatus?.query ?? {})
-                    }
+                    page: this.$route.query?.page ? parseInt(this.$route.query?.page, 10) : 1,
+                    pageSize: this.$route.query?.pageSize ? parseInt(this.$route.query?.pageSize, 10) : 20
                 })
             }
-        },
-
-        mounted () {
-            webSocketMessage.installWsMessage(this.requestHistory)
             if (this.routePipelineVersion) {
-                this.initedVersion = true
                 this.requestHistory()
             }
+        },
+        mounted () {
+            webSocketMessage.installWsMessage(this.requestHistory)
         },
 
         beforeDestroy () {
@@ -747,6 +758,14 @@
                 this.setHistoryPageStatus({
                     page: 1,
                     pageSize: limit
+                })
+                this.$router.push({
+                    params: this.$route.params,
+                    query: {
+                        ...this.$route.query,
+                        page: 1,
+                        pageSize: limit
+                    }
                 })
                 this.$nextTick(() => {
                     this.requestHistory()

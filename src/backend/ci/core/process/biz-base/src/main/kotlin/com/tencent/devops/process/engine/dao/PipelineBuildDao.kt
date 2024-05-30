@@ -59,6 +59,7 @@ import org.jooq.DatePart
 import org.jooq.Record2
 import org.jooq.RecordMapper
 import org.jooq.SelectConditionStep
+import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
 import java.time.LocalDateTime
@@ -1659,6 +1660,25 @@ class PipelineBuildDao {
         }
     }
 
+    fun batchCountBuildNumByVersion(
+        dslContext: DSLContext,
+        projectId: String,
+        pipelineId: String,
+        versions: Set<Int>
+    ): List<Record2<Int, Int>> {
+        return with(T_PIPELINE_BUILD_HISTORY) {
+            val conditions = mutableListOf<Condition>()
+            conditions.add(PROJECT_ID.eq(projectId))
+            conditions.add(PIPELINE_ID.eq(pipelineId))
+            conditions.add(VERSION.`in`(versions))
+            dslContext.select(VERSION, DSL.count())
+                .from(this)
+                .where(conditions)
+                .groupBy(VERSION)
+                .fetch()
+        }
+    }
+
     fun getDebugResourceStr(
         dslContext: DSLContext,
         projectId: String,
@@ -1712,7 +1732,7 @@ class PipelineBuildDao {
                     pipelineId = t.pipelineId,
                     buildId = t.buildId,
                     version = t.version,
-                    versionName = t.versionName,
+                    versionName = t.versionName ?: "V${t.version}(init)",
                     yamlVersion = t.yamlVersion,
                     buildNum = t.buildNum,
                     trigger = t.trigger,
@@ -1720,7 +1740,7 @@ class PipelineBuildDao {
                     // queueTime在数据库中必定会写值，不为空，以防万一用当前时间兜底
                     queueTime = t.queueTime?.timestampmilli() ?: LocalDateTime.now().timestampmilli(),
                     startUser = t.startUser,
-                    triggerUser = t.triggerUser,
+                    triggerUser = t.triggerUser ?: t.startUser ?: "",
                     startTime = t.startTime?.timestampmilli(),
                     endTime = t.endTime?.timestampmilli(),
                     taskCount = t.taskCount,
@@ -1782,7 +1802,7 @@ class PipelineBuildDao {
                     status = BuildStatus.values()[t.status],
                     queueTime = t.queueTime?.timestampmilli() ?: 0L,
                     startUser = t.startUser,
-                    triggerUser = t.triggerUser,
+                    triggerUser = t.triggerUser ?: t.startUser ?: "",
                     startTime = t.startTime?.timestampmilli() ?: 0L,
                     endTime = t.endTime?.timestampmilli() ?: 0L,
                     taskCount = t.taskCount,
