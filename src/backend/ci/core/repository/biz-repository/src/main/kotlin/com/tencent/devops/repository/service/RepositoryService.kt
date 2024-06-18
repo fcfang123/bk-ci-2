@@ -538,6 +538,12 @@ class RepositoryService @Autowired constructor(
             .setInstanceName(repository.aliasName)
             .setInstance(repository)
         createResource(userId, projectId, repositoryId, repository.aliasName)
+        repositoryService.addResourceAuthorization(
+            projectId = projectId,
+            userId = userId,
+            repositoryId = repositoryId,
+            repository = repository
+        )
         try {
             if (repository.enablePac == true) {
                 client.get(ServicePipelineYamlResource::class).enable(
@@ -1326,7 +1332,7 @@ class RepositoryService @Autowired constructor(
         if (atomRefRepositoryInfo.isEmpty()) {
             return
         }
-        val repoInfos = mutableListOf <TRepositoryRecord>()
+        val repoInfos = mutableListOf<TRepositoryRecord>()
         // 过滤无效数据
         atomRefRepositoryInfo.forEach {
             val repositoryRecord = repositoryDao.getById(
@@ -1383,6 +1389,24 @@ class RepositoryService @Autowired constructor(
             else ->
                 AuthorizeResult(200, "")
         }
+    }
+
+    fun listRepositoryAuthorization(
+        projectId: String,
+        limit: Int,
+        offset: Int
+    ): Pair<Int, List<RepositoryInfo>> {
+        val repositoryAuthorizationInfos = repositoryDao.listRepositoryAuthorization(
+            dslContext = dslContext,
+            projectId = projectId,
+            limit = limit,
+            offset = offset
+        )
+        val count = repositoryDao.countRepositoryAuthorization(
+            dslContext = dslContext,
+            projectId = projectId
+        )
+        return Pair(count, repositoryAuthorizationInfos)
     }
 
     companion object {

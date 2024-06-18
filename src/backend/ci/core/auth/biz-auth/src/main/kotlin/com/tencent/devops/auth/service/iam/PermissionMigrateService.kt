@@ -30,6 +30,7 @@ package com.tencent.devops.auth.service.iam
 
 import com.tencent.devops.auth.pojo.dto.MigrateResourceDTO
 import com.tencent.devops.auth.pojo.dto.PermissionHandoverDTO
+import com.tencent.devops.common.api.pojo.Result
 import com.tencent.devops.common.auth.api.pojo.ProjectConditionDTO
 
 /**
@@ -99,4 +100,16 @@ interface PermissionMigrateService {
     fun autoRenewal(
         projectConditionDTO: ProjectConditionDTO
     ): Boolean
+
+    /**
+     * 迁移资源授权--按照项目
+     */
+    fun migrateResourceAuthorization(
+        projectCodes: List<String>
+    ): Boolean
+
+    /**
+     * 全量迁移资源授权
+     */
+    fun migrateAllResourceAuthorization(): Boolean
 }

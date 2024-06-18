@@ -32,9 +32,11 @@ import com.tencent.bk.sdk.iam.service.v2.V2ManagerService
 import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.constant.AuthMessageCode.ERROR_RESOURCE_CREATE_FAIL
 import com.tencent.devops.auth.pojo.AuthResourceInfo
+import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationDTO
 import com.tencent.devops.auth.provider.rbac.pojo.enums.AuthGroupCreateMode
 import com.tencent.devops.auth.provider.rbac.pojo.event.AuthResourceGroupCreateEvent
 import com.tencent.devops.auth.provider.rbac.pojo.event.AuthResourceGroupModifyEvent
+import com.tencent.devops.auth.service.PermissionAuthorizationService
 import com.tencent.devops.auth.service.iam.PermissionProjectService
 import com.tencent.devops.auth.service.iam.PermissionResourceService
 import com.tencent.devops.auth.service.iam.PermissionService
@@ -64,7 +66,8 @@ class RbacPermissionResourceService(
     private val permissionProjectService: PermissionProjectService,
     private val traceEventDispatcher: TraceEventDispatcher,
     private val iamV2ManagerService: V2ManagerService,
-    private val client: Client
+    private val client: Client,
+    private val permissionAuthorizationService: PermissionAuthorizationService
 ) : PermissionResourceService {
 
     companion object {
@@ -266,6 +269,16 @@ class RbacPermissionResourceService(
                 resourceCode = resourceCode,
                 resourceName = resourceName
             )
+            permissionAuthorizationService.modifyResourceAuthorization(
+                listOf(
+                    ResourceAuthorizationDTO(
+                        projectCode = projectCode,
+                        resourceType = resourceType,
+                        resourceCode = resourceCode,
+                        resourceName = resourceName
+                    )
+                )
+            )
             traceEventDispatcher.dispatch(
                 AuthResourceGroupModifyEvent(
                     managerId = resourceInfo.relationId.toInt(),
@@ -297,6 +310,11 @@ class RbacPermissionResourceService(
             }
         }
         authResourceService.delete(
+            projectCode = projectCode,
+            resourceType = resourceType,
+            resourceCode = resourceCode
+        )
+        permissionAuthorizationService.deleteResourceAuthorization(
             projectCode = projectCode,
             resourceType = resourceType,
             resourceCode = resourceCode

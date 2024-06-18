@@ -133,4 +133,6 @@ object AuthMessageCode {
 
     const val ERROR_MOA_CREDENTIAL_KEY_VERIFY_FAIL = "2121082" // MOA票据校验失败
     const val ERROR_USER_NOT_BELONG_TO_THE_PROJECT = "2121083" // 用户不属于项目
+
+    const val ERROR_RESOURCE_AUTHORIZATION_NOT_FOUND = "2121084" // 授权记录不存在
 }

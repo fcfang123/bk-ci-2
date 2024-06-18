@@ -35,11 +35,15 @@ import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.exception.PermissionForbiddenException
 import com.tencent.devops.common.api.pojo.Page
 import com.tencent.devops.common.api.util.HashUtil
+import com.tencent.devops.common.api.util.MessageUtil
 import com.tencent.devops.common.api.util.PageUtil
+import com.tencent.devops.common.api.util.timestampmilli
 import com.tencent.devops.common.audit.ActionAuditContent
 import com.tencent.devops.common.auth.api.ActionId
 import com.tencent.devops.common.auth.api.AuthPermission
+import com.tencent.devops.common.auth.api.AuthResourceType
 import com.tencent.devops.common.auth.api.ResourceTypeId
+import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationHandoverDTO
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.environment.constant.EnvironmentMessageCode.ERROR_ENV_NO_DEL_PERMISSSION
 import com.tencent.devops.environment.constant.EnvironmentMessageCode.ERROR_NODE_CHANGE_USER_NOT_SUPPORT
@@ -52,6 +56,7 @@ import com.tencent.devops.environment.dao.EnvNodeDao
 import com.tencent.devops.environment.dao.NodeDao
 import com.tencent.devops.environment.dao.slave.SlaveGatewayDao
 import com.tencent.devops.environment.dao.thirdpartyagent.ThirdPartyAgentDao
+import com.tencent.devops.environment.permission.EnvironmentAuthorizationService
 import com.tencent.devops.environment.permission.EnvironmentPermissionService
 import com.tencent.devops.environment.pojo.NodeBaseInfo
 import com.tencent.devops.environment.pojo.NodeWithPermission
@@ -69,6 +74,7 @@ import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
@@ -470,7 +476,7 @@ class NodeService @Autowired constructor(
         return nodeRecords.map { NodeStringIdUtils.getNodeBaseInfo(it) }
     }
 
-    fun changeCreatedUser(userId: String, projectId: String, nodeHashId: String) {
+    fun changeCreatedUser(userId: String, projectId: String, nodeHashId: String): String {
         val nodeId = HashUtil.decodeIdToLong(nodeHashId)
         val node = nodeDao.get(dslContext, projectId, nodeId) ?: throw ErrorCodeException(
             errorCode = ERROR_NODE_NOT_EXISTS,
@@ -483,14 +489,66 @@ class NodeService @Autowired constructor(
                 if (isOperator || isBakOperator) {
                     nodeDao.updateCreatedUser(dslContext, nodeId, userId)
                 } else {
-                    throw ErrorCodeException(errorCode = ERROR_NODE_NO_EDIT_PERMISSSION)
+                    throw ErrorCodeException(
+                        errorCode = ERROR_NODE_NO_EDIT_PERMISSSION,
+                        defaultMessage = MessageUtil.getMessageByLocale(
+                            messageCode = ERROR_NODE_NO_EDIT_PERMISSSION,
+                            language = I18nUtil.getLanguage(userId)
+                        )
+                    )
                 }
             }
-
             else -> {
                 throw ErrorCodeException(
                     errorCode = ERROR_NODE_CHANGE_USER_NOT_SUPPORT,
-                    params = arrayOf(NodeType.getTypeName(node.nodeType))
+                    params = arrayOf(NodeType.getTypeName(node.nodeType)),
+                    defaultMessage = MessageUtil.getMessageByLocale(
+                        messageCode = ERROR_NODE_CHANGE_USER_NOT_SUPPORT,
+                        language = I18nUtil.getLanguage(userId),
+                        params = arrayOf(NodeType.getTypeName(node.nodeType))
+                    )
+                )
+            }
+        }
+        return node.displayName
+    }
+
+    fun checkCmdbOperator(
+        userId: String,
+        projectId: String,
+        nodeHashId: String
+    ): Boolean {
+        val nodeId = HashUtil.decodeIdToLong(nodeHashId)
+        val node = nodeDao.get(dslContext, projectId, nodeId) ?: throw ErrorCodeException(
+            errorCode = ERROR_NODE_NOT_EXISTS,
+            defaultMessage = "the node does not exist",
+            params = arrayOf(nodeHashId)
+        )
+        return when (node.nodeType) {
+            NodeType.CMDB.name -> {
+                val isOperator = userId == node.operator
+                val isBakOperator = node.bakOperator.split(";").contains(userId)
+                if (isOperator || isBakOperator) {
+                    true
+                } else {
+                    throw ErrorCodeException(
+                        errorCode = ERROR_NODE_NO_EDIT_PERMISSSION,
+                        defaultMessage = MessageUtil.getMessageByLocale(
+                            messageCode = ERROR_NODE_NO_EDIT_PERMISSSION,
+                            language = I18nUtil.getLanguage(userId)
+                        )
+                    )
+                }
+            }
+            else -> {
+                throw ErrorCodeException(
+                    errorCode = ERROR_NODE_CHANGE_USER_NOT_SUPPORT,
+                    params = arrayOf(NodeType.getTypeName(node.nodeType)),
+                    defaultMessage = MessageUtil.getMessageByLocale(
+                        messageCode = ERROR_NODE_CHANGE_USER_NOT_SUPPORT,
+                        language = I18nUtil.getLanguage(userId),
+                        params = arrayOf(NodeType.getTypeName(node.nodeType))
+                    )
                 )
             }
         }
@@ -648,6 +706,28 @@ class NodeService @Autowired constructor(
             logger.error("AUTH|refreshGateway failed with error: ", ignore)
             false
         }
+    }
+
+    fun getNodeInfosAndCountByType(
+        projectId: String,
+        nodeType: NodeType,
+        limit: Int,
+        offset: Int
+    ): Pair<List<NodeBaseInfo>, Long> {
+        val nodeInfos = nodeDao.listNodesByType(
+            dslContext = dslContext,
+            projectId = projectId,
+            nodeType = NodeType.CMDB.name,
+            offset = offset,
+            limit = limit
+        ).map { NodeStringIdUtils.getNodeBaseInfo(it) }
+
+        val count = nodeDao.countByNodeType(
+            dslContext = dslContext,
+            projectId = projectId,
+            nodeType = NodeType.CMDB
+        )
+        return Pair(nodeInfos, count)
     }
 
     fun addHashId() {

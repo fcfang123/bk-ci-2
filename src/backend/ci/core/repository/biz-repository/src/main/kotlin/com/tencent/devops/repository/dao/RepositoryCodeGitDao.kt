@@ -27,11 +27,15 @@
 
 package com.tencent.devops.repository.dao
 
+import com.tencent.devops.common.api.enums.ScmType
+import com.tencent.devops.model.repository.tables.TRepository
 import com.tencent.devops.model.repository.tables.TRepositoryCodeGit
 import com.tencent.devops.model.repository.tables.records.TRepositoryCodeGitRecord
 import com.tencent.devops.repository.pojo.UpdateRepositoryInfoRequest
 import com.tencent.devops.repository.pojo.enums.RepoAuthType
 import org.jooq.DSLContext
+import org.jooq.Record
+import org.jooq.Record4
 import org.jooq.Result
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime

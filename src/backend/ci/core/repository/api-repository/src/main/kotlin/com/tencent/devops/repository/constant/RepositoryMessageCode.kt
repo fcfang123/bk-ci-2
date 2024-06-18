@@ -90,6 +90,8 @@ object RepositoryMessageCode {
     const val ATOM_REPO_CAN_NOT_EDIT = "2115040" // 插件仓库不得修改
     const val ATOM_REPO_CAN_NOT_DELETE = "2115041" // 插件仓库不得删除
 
+    const val ERROR_USER_HAVE_NOT_USED_OAUTH = "2115042" // 用户没有使用过Oauth
+
     const val BK_REQUEST_FILE_SIZE_LIMIT = "bkRequestFileSizeLimit" // 请求文件不能超过1M
     const val OPERATION_ADD_CHECK_RUNS = "OperationAddCheckRuns" // 添加检测任务
     const val OPERATION_UPDATE_CHECK_RUNS = "OperationUpdateCheckRuns" // 更新检测任务

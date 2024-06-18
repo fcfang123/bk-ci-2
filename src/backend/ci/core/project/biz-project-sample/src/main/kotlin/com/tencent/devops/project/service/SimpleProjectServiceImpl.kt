@@ -65,41 +65,7 @@ import java.io.File
 
 @Suppress("ALL", "UNUSED")
 @Service
-class SimpleProjectServiceImpl @Autowired constructor(
-    projectPermissionService: ProjectPermissionService,
-    dslContext: DSLContext,
-    projectDao: ProjectDao,
-    projectJmxApi: ProjectJmxApi,
-    redisOperation: RedisOperation,
-    client: Client,
-    projectDispatcher: ProjectDispatcher,
-    authPermissionApi: AuthPermissionApi,
-    projectAuthServiceCode: ProjectAuthServiceCode,
-    shardingRoutingRuleAssignService: ShardingRoutingRuleAssignService,
-    objectMapper: ObjectMapper,
-    projectExtService: ProjectExtService,
-    projectApprovalService: ProjectApprovalService,
-    clientTokenService: ClientTokenService,
-    profile: Profile,
-    projectUpdateHistoryDao: ProjectUpdateHistoryDao
-) : AbsProjectServiceImpl(
-    projectPermissionService = projectPermissionService,
-    dslContext = dslContext,
-    projectDao = projectDao,
-    projectJmxApi = projectJmxApi,
-    redisOperation = redisOperation,
-    client = client,
-    projectDispatcher = projectDispatcher,
-    authPermissionApi = authPermissionApi,
-    projectAuthServiceCode = projectAuthServiceCode,
-    shardingRoutingRuleAssignService = shardingRoutingRuleAssignService,
-    objectMapper = objectMapper,
-    projectExtService = projectExtService,
-    projectApprovalService = projectApprovalService,
-    clientTokenService = clientTokenService,
-    profile = profile,
-    projectUpdateHistoryDao = projectUpdateHistoryDao
-) {
+class SimpleProjectServiceImpl : AbsProjectServiceImpl() {
 
     override fun getDeptInfo(userId: String): UserDeptDetail {
         return UserDeptDetail(

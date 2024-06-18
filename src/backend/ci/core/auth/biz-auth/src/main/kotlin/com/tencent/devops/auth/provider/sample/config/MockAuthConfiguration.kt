@@ -1,5 +1,6 @@
 package com.tencent.devops.auth.provider.sample.config
 
+import com.tencent.devops.auth.provider.rbac.service.migrate.MigrateResourceAuthorizationService
 import com.tencent.devops.auth.provider.sample.service.SampleAuthAuthorizationScopesService
 import com.tencent.devops.auth.provider.sample.service.SampleAuthMonitorSpaceService
 import com.tencent.devops.auth.provider.sample.service.SampleAuthPermissionProjectService
@@ -24,6 +25,7 @@ import com.tencent.devops.auth.service.AuthMonitorSpaceService
 import com.tencent.devops.auth.service.DefaultDeptServiceImpl
 import com.tencent.devops.auth.service.DeptService
 import com.tencent.devops.auth.service.OrganizationService
+import com.tencent.devops.auth.service.PermissionAuthorizationService
 import com.tencent.devops.auth.service.SuperManagerService
 import com.tencent.devops.auth.service.iam.PermissionApplyService
 import com.tencent.devops.auth.service.iam.PermissionExtService
@@ -97,7 +99,11 @@ class MockAuthConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(PermissionResourceService::class)
-    fun samplePermissionResourceService() = SamplePermissionResourceService()
+    fun samplePermissionResourceService(
+        permissionAuthorizationService: PermissionAuthorizationService
+    ) = SamplePermissionResourceService(
+        permissionAuthorizationService = permissionAuthorizationService
+    )
 
     @Bean
     @ConditionalOnMissingBean(PermissionResourceGroupService::class)
@@ -121,7 +127,11 @@ class MockAuthConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(PermissionMigrateService::class)
-    fun samplePermissionMigrateService() = SamplePermissionMigrateService()
+    fun samplePermissionMigrateService(
+        migrateResourceAuthorizationService: MigrateResourceAuthorizationService
+    ) = SamplePermissionMigrateService(
+        migrateResourceAuthorizationService = migrateResourceAuthorizationService
+    )
 
     @Bean
     @ConditionalOnMissingBean(AuthAuthorizationScopesService::class)

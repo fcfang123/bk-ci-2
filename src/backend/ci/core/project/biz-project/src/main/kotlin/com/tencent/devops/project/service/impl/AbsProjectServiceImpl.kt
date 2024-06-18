@@ -80,6 +80,7 @@ import com.tencent.devops.project.jmx.api.ProjectJmxApi
 import com.tencent.devops.project.jmx.api.ProjectJmxApi.Companion.PROJECT_LIST
 import com.tencent.devops.project.pojo.AuthProjectCreateInfo
 import com.tencent.devops.project.pojo.ProjectBaseInfo
+import com.tencent.devops.project.pojo.ProjectByConditionDTO
 import com.tencent.devops.project.pojo.ProjectCollation
 import com.tencent.devops.project.pojo.ProjectCreateExtInfo
 import com.tencent.devops.project.pojo.ProjectCreateInfo
@@ -93,7 +94,6 @@ import com.tencent.devops.project.pojo.ProjectUpdateCreatorDTO
 import com.tencent.devops.project.pojo.ProjectUpdateHistoryInfo
 import com.tencent.devops.project.pojo.ProjectUpdateInfo
 import com.tencent.devops.project.pojo.ProjectVO
-import com.tencent.devops.project.pojo.ProjectByConditionDTO
 import com.tencent.devops.project.pojo.ResourceUpdateInfo
 import com.tencent.devops.project.pojo.Result
 import com.tencent.devops.project.pojo.enums.ProjectApproveStatus
@@ -124,24 +124,54 @@ import java.util.regex.Pattern
 import javax.ws.rs.NotFoundException
 
 @Suppress("ALL")
-abstract class AbsProjectServiceImpl @Autowired constructor(
-    val projectPermissionService: ProjectPermissionService,
-    val dslContext: DSLContext,
-    val projectDao: ProjectDao,
-    private val projectJmxApi: ProjectJmxApi,
-    val redisOperation: RedisOperation,
-    val client: Client,
-    private val projectDispatcher: ProjectDispatcher,
-    private val authPermissionApi: AuthPermissionApi,
-    private val projectAuthServiceCode: ProjectAuthServiceCode,
-    private val shardingRoutingRuleAssignService: ShardingRoutingRuleAssignService,
-    private val objectMapper: ObjectMapper,
-    private val projectExtService: ProjectExtService,
-    private val projectApprovalService: ProjectApprovalService,
-    private val clientTokenService: ClientTokenService,
-    private val profile: Profile,
-    private val projectUpdateHistoryDao: ProjectUpdateHistoryDao
-) : ProjectService {
+abstract class AbsProjectServiceImpl : ProjectService {
+    @Autowired
+    lateinit var projectPermissionService: ProjectPermissionService
+
+    @Autowired
+    lateinit var dslContext: DSLContext
+
+    @Autowired
+    lateinit var projectDao: ProjectDao
+
+    @Autowired
+    lateinit var projectJmxApi: ProjectJmxApi
+
+    @Autowired
+    lateinit var redisOperation: RedisOperation
+
+    @Autowired
+    lateinit var client: Client
+
+    @Autowired
+    lateinit var projectDispatcher: ProjectDispatcher
+
+    @Autowired
+    lateinit var authPermissionApi: AuthPermissionApi
+
+    @Autowired
+    lateinit var projectAuthServiceCode: ProjectAuthServiceCode
+
+    @Autowired
+    lateinit var shardingRoutingRuleAssignService: ShardingRoutingRuleAssignService
+
+    @Autowired
+    lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    lateinit var projectExtService: ProjectExtService
+
+    @Autowired
+    lateinit var projectApprovalService: ProjectApprovalService
+
+    @Autowired
+    lateinit var clientTokenService: ClientTokenService
+
+    @Autowired
+    lateinit var profile: Profile
+
+    @Autowired
+    lateinit var projectUpdateHistoryDao: ProjectUpdateHistoryDao
 
     override fun validate(validateType: ProjectValidateType, name: String, projectId: String?) {
         if (name.isBlank()) {
