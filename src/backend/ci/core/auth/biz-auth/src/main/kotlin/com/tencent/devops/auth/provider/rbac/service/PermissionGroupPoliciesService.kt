@@ -29,6 +29,12 @@
 package com.tencent.devops.auth.provider.rbac.service
 
 import com.fasterxml.jackson.core.type.TypeReference
+import com.tencent.bk.sdk.iam.config.IamConfiguration
+import com.tencent.bk.sdk.iam.dto.grant.GrantPathV2DTO
+import com.tencent.bk.sdk.iam.dto.grant.GrantResourceV2DTO
+import com.tencent.bk.sdk.iam.dto.grant.ManagerRoleGroupGrantDTO
+import com.tencent.bk.sdk.iam.dto.manager.Action
+import com.tencent.bk.sdk.iam.service.v2.V2GrantService
 import com.tencent.bk.sdk.iam.service.v2.V2ManagerService
 import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.constant.AuthMessageCode.ERROR_AUTH_GROUP_NOT_EXIST
@@ -39,8 +45,11 @@ import com.tencent.devops.auth.pojo.vo.IamGroupPoliciesVo
 import com.tencent.devops.auth.service.AuthAuthorizationScopesService
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.util.JsonUtil
+import com.tencent.devops.common.auth.api.ActionId.PROJECT_VISIT
 import com.tencent.devops.common.auth.api.AuthResourceType
+import com.tencent.devops.project.pojo.ProjectByConditionDTO
 import org.jooq.DSLContext
+import org.slf4j.LoggerFactory
 
 /**
  * 权限组策略
@@ -52,8 +61,14 @@ class PermissionGroupPoliciesService(
     private val dslContext: DSLContext,
     private val authResourceGroupConfigDao: AuthResourceGroupConfigDao,
     private val authResourceGroupDao: AuthResourceGroupDao,
-    private val authAuthorizationScopesService: AuthAuthorizationScopesService
+    private val authAuthorizationScopesService: AuthAuthorizationScopesService,
+    private val iamConfiguration: IamConfiguration,
+    private val grantService: V2GrantService
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(PermissionGroupPoliciesService::class.java)
+    }
+
     fun grantGroupPermission(
         authorizationScopesStr: String,
         projectCode: String,
@@ -121,5 +136,40 @@ class PermissionGroupPoliciesService(
                 permission = groupActions.contains(it.action)
             )
         }
+    }
+
+    fun revokeGroupPolices(projectByConditionDTO: ProjectByConditionDTO) {
+        val groupInfos = authResourceGroupDao.list(
+            dslContext = dslContext,
+            projectCode = projectByConditionDTO.englishName
+        ).filter { it.resourceType != AuthResourceType.PROJECT.value }
+        groupInfos.forEach {
+            val grantPathV2DTO = GrantPathV2DTO.builder()
+                .system(iamConfiguration.systemId)
+                .type(AuthResourceType.PROJECT.value)
+                .name(projectByConditionDTO.projectName)
+                .id(projectByConditionDTO.englishName)
+                .build()
+            val action = Action(PROJECT_VISIT)
+            val grantResourceV2DTO = GrantResourceV2DTO.builder()
+                .system(iamConfiguration.systemId)
+                .type(AuthResourceType.PROJECT.value)
+                .paths(listOf(listOf(grantPathV2DTO)))
+                .build()
+            val managerRoleGroupGrantDTO = ManagerRoleGroupGrantDTO.builder()
+                .system(iamConfiguration.systemId)
+                .actions(listOf(action))
+                .resources(listOf(grantResourceV2DTO))
+                .build()
+            try {
+                grantService.revokeRoleGroupPolicies(
+                    it.relationId.toInt(),
+                    managerRoleGroupGrantDTO
+                )
+            } catch (ignore: Exception) {
+                logger.warn("revoke Group Polices failed!$it", ignore)
+            }
+        }
+        logger.info("revoke group polices ${projectByConditionDTO.englishName}|${groupInfos.map { it.relationId }}")
     }
 }

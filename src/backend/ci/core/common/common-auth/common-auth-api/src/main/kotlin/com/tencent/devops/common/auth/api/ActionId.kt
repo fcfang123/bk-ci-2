@@ -6,6 +6,7 @@ object ActionId {
     const val PROJECT_EDIT = "project_edit"
     const val PROJECT_ENABLE = "project_enable"
     const val PROJECT_MANAGE = "project_manage"
+    const val PROJECT_VISIT = "project_visit"
     const val PROJECT_MANAGE_ARCHIVED_PIPELINE = "project_manage-archived-pipeline"
 
     // 流水线

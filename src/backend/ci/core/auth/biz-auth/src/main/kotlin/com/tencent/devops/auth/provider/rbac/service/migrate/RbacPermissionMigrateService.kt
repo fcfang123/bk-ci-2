@@ -37,6 +37,7 @@ import com.tencent.devops.auth.pojo.dto.PermissionHandoverDTO
 import com.tencent.devops.auth.pojo.enum.AuthMigrateStatus
 import com.tencent.devops.auth.provider.rbac.service.AuthResourceService
 import com.tencent.devops.auth.provider.rbac.service.PermissionGradeManagerService
+import com.tencent.devops.auth.provider.rbac.service.PermissionGroupPoliciesService
 import com.tencent.devops.auth.provider.rbac.service.RbacCacheService
 import com.tencent.devops.auth.service.iam.MigrateCreatorFixService
 import com.tencent.devops.auth.service.iam.PermissionMigrateService
@@ -83,7 +84,8 @@ class RbacPermissionMigrateService constructor(
     private val authMigrationDao: AuthMigrationDao,
     private val authMonitorSpaceDao: AuthMonitorSpaceDao,
     private val cacheService: RbacCacheService,
-    private val permissionResourceMemberService: PermissionResourceMemberService
+    private val permissionResourceMemberService: PermissionResourceMemberService,
+    private val permissionGroupPoliciesService: PermissionGroupPoliciesService
 ) : PermissionMigrateService {
 
     companion object {
@@ -629,6 +631,33 @@ class RbacPermissionMigrateService constructor(
                 }
                 offset += limit
             } while (migrateProjects.size == limit)
+        }
+        return true
+    }
+
+    override fun revokePermissions(projectConditionDTO: ProjectConditionDTO): Boolean {
+        logger.info("start to revoke permissions by condition|$projectConditionDTO")
+        toRbacExecutorService.submit {
+            var offset = 0
+            val limit = PageUtil.MAX_PAGE_SIZE / 2
+            do {
+                val projects = client.get(ServiceProjectResource::class).listProjectsByCondition(
+                    projectConditionDTO = projectConditionDTO,
+                    limit = limit,
+                    offset = offset
+                ).data ?: break
+                logger.info("revoke projects permissions,${projects.map { it.englishName }}")
+                projects.forEach {
+                    val traceId = MDC.get(TraceTag.BIZID)
+                    migrateProjectsExecutorService.submit {
+                        MDC.put(TraceTag.BIZID, traceId)
+                        permissionGroupPoliciesService.revokeGroupPolices(
+                            projectByConditionDTO = it
+                        )
+                    }
+                }
+                offset += limit
+            } while (projects.size == limit)
         }
         return true
     }

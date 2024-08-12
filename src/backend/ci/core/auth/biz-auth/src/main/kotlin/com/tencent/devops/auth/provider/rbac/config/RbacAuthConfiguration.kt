@@ -469,7 +469,8 @@ class RbacAuthConfiguration {
         authMigrationDao: AuthMigrationDao,
         authMonitorSpaceDao: AuthMonitorSpaceDao,
         cacheService: RbacCacheService,
-        permissionResourceMemberService: RbacPermissionResourceMemberService
+        permissionResourceMemberService: RbacPermissionResourceMemberService,
+        permissionGroupPoliciesService: PermissionGroupPoliciesService
     ) = RbacPermissionMigrateService(
         client = client,
         migrateResourceService = migrateResourceService,
@@ -485,7 +486,8 @@ class RbacAuthConfiguration {
         authMigrationDao = authMigrationDao,
         authMonitorSpaceDao = authMonitorSpaceDao,
         cacheService = cacheService,
-        permissionResourceMemberService = permissionResourceMemberService
+        permissionResourceMemberService = permissionResourceMemberService,
+        permissionGroupPoliciesService = permissionGroupPoliciesService
     )
 
     @Bean

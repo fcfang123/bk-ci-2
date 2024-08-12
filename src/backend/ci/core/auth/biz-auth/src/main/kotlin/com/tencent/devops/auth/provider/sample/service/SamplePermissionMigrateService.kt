@@ -85,4 +85,8 @@ class SamplePermissionMigrateService : PermissionMigrateService {
     override fun autoRenewal(projectConditionDTO: ProjectConditionDTO): Boolean {
         return true
     }
+
+    override fun revokePermissions(projectConditionDTO: ProjectConditionDTO): Boolean {
+        return true
+    }
 }

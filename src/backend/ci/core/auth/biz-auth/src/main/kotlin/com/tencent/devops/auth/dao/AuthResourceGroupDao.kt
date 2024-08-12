@@ -171,15 +171,15 @@ class AuthResourceGroupDao {
         }
     }
 
-    fun listByRelationId(
+    fun list(
         dslContext: DSLContext,
         projectCode: String,
-        iamGroupIds: List<String>
+        iamGroupIds: List<String>? = null
     ): Result<TAuthResourceGroupRecord> {
         return with(TAuthResourceGroup.T_AUTH_RESOURCE_GROUP) {
             dslContext.selectFrom(this)
                 .where(PROJECT_CODE.eq(projectCode))
-                .and(RELATION_ID.`in`(iamGroupIds))
+                .let { if (iamGroupIds != null) it.and(RELATION_ID.`in`(iamGroupIds)) else it }
                 .fetch()
         }
     }

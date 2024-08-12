@@ -310,7 +310,7 @@ class RbacPermissionResourceMemberService constructor(
             managerId = managerId
         )
         // 3. 获取由蓝盾创建的用户组列表
-        val resourceGroupInfoList = authResourceGroupDao.listByRelationId(
+        val resourceGroupInfoList = authResourceGroupDao.list(
             dslContext = dslContext,
             projectCode = projectCode,
             iamGroupIds = iamGroupInfoList.map { it.id.toString() }

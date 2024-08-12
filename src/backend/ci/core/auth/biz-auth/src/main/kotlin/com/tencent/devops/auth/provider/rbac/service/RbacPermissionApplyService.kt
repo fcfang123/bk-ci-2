@@ -241,7 +241,7 @@ class RbacPermissionApplyService @Autowired constructor(
 
         val groupIds = managerRoleGroupInfoList.map { it.id.toString() }
         val verifyMemberJoinedResult = verifyMemberJoined(userId, groupIds)
-        val dbGroupRecords = authResourceGroupDao.listByRelationId(dslContext, projectId, groupIds)
+        val dbGroupRecords = authResourceGroupDao.list(dslContext, projectId, groupIds)
 
         return managerRoleGroupInfoList.map { gInfo ->
             val dbGroupRecord = dbGroupRecords.find { record -> record.relationId == gInfo.id.toString() }

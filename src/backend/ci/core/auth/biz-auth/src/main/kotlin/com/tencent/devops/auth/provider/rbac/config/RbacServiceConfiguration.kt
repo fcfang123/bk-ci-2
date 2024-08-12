@@ -30,6 +30,7 @@ package com.tencent.devops.auth.provider.rbac.config
 
 import com.tencent.bk.sdk.iam.config.IamConfiguration
 import com.tencent.bk.sdk.iam.service.PolicyService
+import com.tencent.bk.sdk.iam.service.v2.V2GrantService
 import com.tencent.bk.sdk.iam.service.v2.V2ManagerService
 import com.tencent.devops.auth.dao.AuthActionDao
 import com.tencent.devops.auth.dao.AuthItsmCallbackDao
@@ -137,14 +138,18 @@ class RbacServiceConfiguration {
         dslContext: DSLContext,
         authResourceGroupConfigDao: AuthResourceGroupConfigDao,
         authResourceGroupDao: AuthResourceGroupDao,
-        authAuthorizationScopesService: AuthAuthorizationScopesService
+        authAuthorizationScopesService: AuthAuthorizationScopesService,
+        iamConfiguration: IamConfiguration,
+        grantService: V2GrantService
     ) = PermissionGroupPoliciesService(
         iamV2ManagerService = iamV2ManagerService,
         authActionDao = authActionDao,
         dslContext = dslContext,
         authResourceGroupConfigDao = authResourceGroupConfigDao,
         authResourceGroupDao = authResourceGroupDao,
-        authAuthorizationScopesService = authAuthorizationScopesService
+        authAuthorizationScopesService = authAuthorizationScopesService,
+        iamConfiguration = iamConfiguration,
+        grantService = grantService
     )
 
     @Bean

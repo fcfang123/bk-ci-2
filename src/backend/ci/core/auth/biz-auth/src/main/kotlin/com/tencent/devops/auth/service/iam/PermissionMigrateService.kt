@@ -99,4 +99,8 @@ interface PermissionMigrateService {
     fun autoRenewal(
         projectConditionDTO: ProjectConditionDTO
     ): Boolean
+
+    fun revokePermissions(
+        projectConditionDTO: ProjectConditionDTO
+    ): Boolean
 }
