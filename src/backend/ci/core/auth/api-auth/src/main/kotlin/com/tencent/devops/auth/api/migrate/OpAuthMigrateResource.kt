@@ -140,4 +140,12 @@ interface OpAuthMigrateResource {
         @Parameter(description = "按条件迁移项目实体", required = true)
         projectConditionDTO: ProjectConditionDTO
     ): Result<Boolean>
+
+    @POST
+    @Path("/revokePermissions")
+    @Operation(summary = "回收组权限")
+    fun revokePermissions(
+        @Parameter(description = "按条件迁移项目实体", required = true)
+        projectConditionDTO: ProjectConditionDTO
+    ): Result<Boolean>
 }

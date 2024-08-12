@@ -98,4 +98,8 @@ class OpAuthMigrateResourceImpl @Autowired constructor(
         permissionMigrateService.autoRenewal(projectConditionDTO)
         return Result(true)
     }
+
+    override fun revokePermissions(projectConditionDTO: ProjectConditionDTO): Result<Boolean> {
+        return Result(permissionMigrateService.revokePermissions(projectConditionDTO))
+    }
 }
