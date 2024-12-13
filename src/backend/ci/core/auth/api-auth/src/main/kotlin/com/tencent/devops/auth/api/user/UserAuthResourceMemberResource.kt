@@ -136,7 +136,7 @@ interface UserAuthResourceMemberResource {
         projectId: String,
         @Parameter(description = "批量移除成员请求实体")
         removeMemberDTO: GroupMemberRemoveConditionReq
-    ): Result<Boolean>
+    ): Result<String?>
 
     @DELETE
     @Path("/single/{groupId}/{operateChannel}/remove")
@@ -184,7 +184,7 @@ interface UserAuthResourceMemberResource {
         projectId: String,
         @Parameter(description = "批量交接成员请求实体")
         handoverMemberDTO: GroupMemberHandoverConditionReq
-    ): Result<Boolean>
+    ): Result<String>
 
     @POST
     @Path("/batch/{batchOperateType}/check/")

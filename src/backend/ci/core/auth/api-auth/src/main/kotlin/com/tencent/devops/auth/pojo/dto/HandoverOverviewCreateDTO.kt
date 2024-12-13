@@ -8,9 +8,9 @@ data class HandoverOverviewCreateDTO(
     @get:Schema(title = "项目ID")
     val projectCode: String,
     @get:Schema(title = "项目ID")
-    var title: String,
+    var title: String? = null,
     @get:Schema(title = "流程单号")
-    var flowNo: String,
+    var flowNo: String? = null,
     @get:Schema(title = "申请人")
     val applicant: String,
     @get:Schema(title = "审批人")

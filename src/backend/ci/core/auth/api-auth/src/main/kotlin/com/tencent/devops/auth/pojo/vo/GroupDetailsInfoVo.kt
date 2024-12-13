@@ -33,6 +33,8 @@ data class GroupDetailsInfoVo(
     val operator: String,
     @get:Schema(title = "是否正在交接")
     val beingHandedOver: Boolean? = null,
+    @get:Schema(title = "交接单号")
+    val flowNo: String? = null,
     @get:Schema(title = "组成员类型")
     val memberType: MemberType? = null
 )

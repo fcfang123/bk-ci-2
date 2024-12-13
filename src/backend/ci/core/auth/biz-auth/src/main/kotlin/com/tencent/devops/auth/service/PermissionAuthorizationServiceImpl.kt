@@ -277,7 +277,7 @@ class PermissionAuthorizationServiceImpl(
         operator: String,
         projectCode: String,
         condition: ResourceAuthorizationHandoverConditionRequest
-    ): Boolean {
+    ): String {
         val beingHandoverDetails = permissionHandoverApplicationService.listMemberHandoverDetails(
             projectCode = condition.projectCode,
             memberId = condition.handoverFrom!!,
@@ -300,18 +300,11 @@ class PermissionAuthorizationServiceImpl(
             throw ErrorCodeException(errorCode = ERROR_REPERTORY_HANDOVER_AUTHORIZATION)
         }
         val resourceAuthorizationList = getResourceAuthorizationList(condition = finalCondition)
-        val authorizationCount = resourceAuthorizationList.size
-        val flowNo = permissionHandoverApplicationService.generateFlowNo()
-        val title = permissionHandoverApplicationService.generateTitle(
-            groupCount = 0,
-            authorizationCount = authorizationCount
-        )
         val handoverDetails = mutableListOf<HandoverDetailDTO>()
         resourceAuthorizationList.forEach { authorization ->
             handoverDetails.add(
                 HandoverDetailDTO(
                     projectCode = projectCode,
-                    flowNo = flowNo,
                     itemId = authorization.resourceCode,
                     resourceType = authorization.resourceType,
                     handoverType = HandoverType.AUTHORIZATION
@@ -319,11 +312,9 @@ class PermissionAuthorizationServiceImpl(
             )
         }
         // 创建交接单
-        permissionHandoverApplicationService.createHandoverApplication(
+        val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
-                flowNo = flowNo,
-                title = title,
                 applicant = condition.handoverFrom!!,
                 approver = condition.handoverTo!!,
                 handoverStatus = HandoverStatus.PENDING,
@@ -332,7 +323,7 @@ class PermissionAuthorizationServiceImpl(
             ),
             details = handoverDetails
         )
-        return true
+        return flowNo
     }
 
     override fun resetAllResourceAuthorization(

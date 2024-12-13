@@ -13,6 +13,7 @@ import com.tencent.devops.auth.pojo.request.GroupMemberRemoveConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberRenewalConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberSingleRenewalReq
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewBatchUpdateReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.request.ProjectMembersQueryConditionReq
 import com.tencent.devops.auth.pojo.request.RemoveMemberFromProjectReq
@@ -155,7 +156,7 @@ interface PermissionManageFacadeService {
         userId: String,
         projectCode: String,
         handoverMemberDTO: GroupMemberHandoverConditionReq
-    ): Boolean
+    ): String
 
     /**
      * 批量移除-管理员视角
@@ -173,7 +174,7 @@ interface PermissionManageFacadeService {
         userId: String,
         projectCode: String,
         removeMemberDTO: GroupMemberRemoveConditionReq
-    ): Boolean
+    ): String?
 
     /**
      * 退出单个组
@@ -217,6 +218,11 @@ interface PermissionManageFacadeService {
      * 处理交接审批单
      * */
     fun handleHanoverApplication(request: HandoverOverviewUpdateReq): Boolean
+
+    /**
+     * 批量处理交接审批单
+     * */
+    fun batchHandleHanoverApplications(request: HandoverOverviewBatchUpdateReq): Boolean
 
     /**
      * 根据资源类型进行分类-交接

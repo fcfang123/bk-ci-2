@@ -15,6 +15,8 @@ data class HandoverOverviewQueryReq(
     val title: String? = null,
     @get:Schema(title = "流程单号")
     val flowNo: String? = null,
+    @get:Schema(title = "流程单号列表")
+    val flowNos: List<String>? = null,
     @get:Schema(title = "申请人")
     val applicant: String? = null,
     @get:Schema(title = "审批人")

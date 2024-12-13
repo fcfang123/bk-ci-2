@@ -2,10 +2,10 @@ package com.tencent.devops.auth.provider.sample.service
 
 import com.tencent.devops.auth.pojo.dto.HandoverDetailDTO
 import com.tencent.devops.auth.pojo.dto.HandoverOverviewCreateDTO
-import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.enum.HandoverType
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.vo.HandoverAuthorizationDetailVo
 import com.tencent.devops.auth.pojo.vo.HandoverGroupDetailVo
 import com.tencent.devops.auth.pojo.vo.HandoverOverviewVo
@@ -15,10 +15,9 @@ import com.tencent.devops.common.api.model.SQLPage
 
 class SamplePermissionHandoverApplicationService : PermissionHandoverApplicationService {
     override fun createHandoverApplication(
-        overview: HandoverOverviewCreateDTO,
-        details: List<HandoverDetailDTO>
-    ) {
-        return
+        overview: HandoverOverviewCreateDTO, details: List<HandoverDetailDTO>
+    ): String {
+        return ""
     }
 
     override fun generateTitle(groupCount: Int, authorizationCount: Int): String = ""

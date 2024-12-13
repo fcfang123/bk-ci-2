@@ -42,21 +42,29 @@ class RbacPermissionHandoverApplicationService(
     override fun createHandoverApplication(
         overview: HandoverOverviewCreateDTO,
         details: List<HandoverDetailDTO>
-    ) {
+    ): String {
         logger.info("create handover application:{}|{}", overview, details)
-        // todo 发送邮件/devops-notices通知
-
+        val flowNo = generateFlowNo()
+        val title = generateTitle(
+            groupCount = overview.groupCount,
+            authorizationCount = overview.authorizationCount
+        )
         dslContext.transaction { configuration ->
             val transactionContext = DSL.using(configuration)
             handoverOverviewDao.create(
                 dslContext = transactionContext,
-                overviewDTO = overview
+                overviewDTO = overview.copy(
+                    flowNo = flowNo,
+                    title = title
+                )
             )
             handoverDetailDao.batchCreate(
                 dslContext = transactionContext,
-                handoverDetailDTOs = details
+                handoverDetailDTOs = details.map { it.copy(flowNo = flowNo) }
             )
         }
+        // todo 发送邮件/devops-notices通知
+        return flowNo
     }
 
     override fun generateTitle(

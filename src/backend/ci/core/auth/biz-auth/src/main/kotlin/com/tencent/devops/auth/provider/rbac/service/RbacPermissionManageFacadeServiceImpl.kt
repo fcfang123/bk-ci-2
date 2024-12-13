@@ -37,6 +37,8 @@ import com.tencent.devops.auth.pojo.request.GroupMemberRemoveConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberRenewalConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberSingleRenewalReq
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewBatchUpdateReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewQueryReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.request.ProjectMembersQueryConditionReq
 import com.tencent.devops.auth.pojo.request.RemoveMemberFromProjectReq
@@ -160,7 +162,7 @@ class RbacPermissionManageFacadeServiceImpl(
                 projectCode = projectId,
                 memberId = memberId,
                 handoverType = HandoverType.GROUP
-            ).map { it.itemId.toInt() }.distinct()
+            )
         } else {
             emptyList()
         }
@@ -259,7 +261,7 @@ class RbacPermissionManageFacadeServiceImpl(
         uniqueManagerGroups: List<Int>,
         authResourceGroupMember: AuthResourceGroupMember,
         operateChannel: OperateChannel?,
-        groupsBeingHandover: List<Int>
+        groupsBeingHandover: List<HandoverDetailDTO>
     ): GroupDetailsInfoVo {
         // 如果用户离职，查询权限中心接口会报错，因此从数据库直接取数据，而不去调用权限中心接口。
         val (expiredAt, joinedTime) = if (groupMemberDetail != null) {
@@ -323,8 +325,8 @@ class RbacPermissionManageFacadeServiceImpl(
                 else -> JoinedType.DIRECT
             },
             operator = "",
-            beingHandedOver = authResourceGroupMember.memberType == MemberType.USER.type
-                && groupsBeingHandover.contains(groupId),
+            beingHandedOver = groupsBeingHandover.map { it.itemId.toInt() }.contains(groupId),
+            flowNo = groupsBeingHandover.firstOrNull { it.itemId.toInt() == groupId }?.flowNo,
             memberType = MemberType.get(authResourceGroupMember.memberType)
         )
     }
@@ -1041,7 +1043,7 @@ class RbacPermissionManageFacadeServiceImpl(
         userId: String,
         projectCode: String,
         handoverMemberDTO: GroupMemberHandoverConditionReq
-    ): Boolean {
+    ): String {
         logger.info("batch handover group members from personal $userId|$projectCode|$handoverMemberDTO")
         handoverMemberDTO.checkHandoverTo()
         // 成员直接加入的组
@@ -1050,7 +1052,9 @@ class RbacPermissionManageFacadeServiceImpl(
             commonCondition = handoverMemberDTO
         )[MemberType.get(MemberType.USER.type)]
         if (groupIds.isNullOrEmpty()) {
-            return true
+            throw ErrorCodeException(
+                errorCode = AuthMessageCode.GROUP_NOT_EXIST
+            )
         }
         val resourceGroups = authResourceGroupDao.listByRelationId(
             dslContext = dslContext,
@@ -1076,16 +1080,10 @@ class RbacPermissionManageFacadeServiceImpl(
             )
         }
         val handoverDetails = mutableListOf<HandoverDetailDTO>()
-        val flowNo = permissionHandoverApplicationService.generateFlowNo()
-        val title = permissionHandoverApplicationService.generateTitle(
-            groupCount = groupIds.size,
-            authorizationCount = invalidPipelines.size + invalidRepertoryIds.size
-        )
         resourceGroups.forEach { groupInfo ->
             handoverDetails.add(
                 HandoverDetailDTO(
                     projectCode = projectCode,
-                    flowNo = flowNo,
                     itemId = groupInfo.relationId,
                     resourceType = groupInfo.resourceType,
                     handoverType = HandoverType.GROUP
@@ -1096,7 +1094,6 @@ class RbacPermissionManageFacadeServiceImpl(
             handoverDetails.add(
                 HandoverDetailDTO(
                     projectCode = projectCode,
-                    flowNo = flowNo,
                     itemId = pipelineId,
                     resourceType = ResourceTypeId.PIPELINE,
                     handoverType = HandoverType.AUTHORIZATION
@@ -1107,7 +1104,6 @@ class RbacPermissionManageFacadeServiceImpl(
             handoverDetails.add(
                 HandoverDetailDTO(
                     projectCode = projectCode,
-                    flowNo = flowNo,
                     itemId = repertoryId,
                     resourceType = ResourceTypeId.REPERTORY,
                     handoverType = HandoverType.AUTHORIZATION
@@ -1115,11 +1111,9 @@ class RbacPermissionManageFacadeServiceImpl(
             )
         }
         // 创建交接单
-        permissionHandoverApplicationService.createHandoverApplication(
+        val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
-                flowNo = flowNo,
-                title = title,
                 applicant = handoverMemberDTO.targetMember.id,
                 approver = handoverMemberDTO.handoverTo.id,
                 handoverStatus = HandoverStatus.PENDING,
@@ -1128,7 +1122,7 @@ class RbacPermissionManageFacadeServiceImpl(
             ),
             details = handoverDetails
         )
-        return true
+        return flowNo
     }
 
     override fun batchDeleteResourceGroupMembersFromManager(
@@ -1251,13 +1245,13 @@ class RbacPermissionManageFacadeServiceImpl(
         userId: String,
         projectCode: String,
         removeMemberDTO: GroupMemberRemoveConditionReq
-    ): Boolean {
+    ): String? {
         logger.info("batch delete group members from personal $userId|$projectCode|$removeMemberDTO")
         // 根据条件获取成员直接加入的用户组
         val groupIds = getGroupIdsByGroupMemberCondition(
             projectCode = projectCode,
             commonCondition = removeMemberDTO
-        )[MemberType.USER] ?: return true
+        )[MemberType.USER] ?: return null
         // 获取导致流水线代持人权限受到影响的用户组及流水线
         val (invalidGroups, invalidPipelines, invalidRepertoryIds) =
             listInvalidAuthorizationsAfterOperatedGroups(
@@ -1302,7 +1296,10 @@ class RbacPermissionManageFacadeServiceImpl(
             operateGroupMemberTask = ::deleteTask
         )
         val handoverDetails = mutableListOf<HandoverDetailDTO>()
-        val flowNo = permissionHandoverApplicationService.generateFlowNo()
+        if (toHandoverGroups.isEmpty() && invalidPipelines.isEmpty() && invalidRepertoryIds.isEmpty()) {
+            return null
+        }
+
         // 交接唯一拥有者、影响代持人权限的用户组
         if (toHandoverGroups.isNotEmpty()) {
             removeMemberDTO.checkHandoverTo()
@@ -1315,7 +1312,6 @@ class RbacPermissionManageFacadeServiceImpl(
                 handoverDetails.add(
                     HandoverDetailDTO(
                         projectCode = projectCode,
-                        flowNo = flowNo,
                         itemId = groupInfo.relationId,
                         resourceType = groupInfo.resourceType,
                         handoverType = HandoverType.GROUP
@@ -1330,7 +1326,6 @@ class RbacPermissionManageFacadeServiceImpl(
                 handoverDetails.add(
                     HandoverDetailDTO(
                         projectCode = projectCode,
-                        flowNo = flowNo,
                         itemId = pipelineId,
                         resourceType = ResourceTypeId.PIPELINE,
                         handoverType = HandoverType.AUTHORIZATION
@@ -1344,7 +1339,6 @@ class RbacPermissionManageFacadeServiceImpl(
                 handoverDetails.add(
                     HandoverDetailDTO(
                         projectCode = projectCode,
-                        flowNo = flowNo,
                         itemId = repertoryId,
                         resourceType = ResourceTypeId.REPERTORY,
                         handoverType = HandoverType.AUTHORIZATION
@@ -1352,15 +1346,9 @@ class RbacPermissionManageFacadeServiceImpl(
                 )
             }
         }
-        val title = permissionHandoverApplicationService.generateTitle(
-            groupCount = toHandoverGroups.size,
-            authorizationCount = invalidPipelines.size + invalidRepertoryIds.size
-        )
-        permissionHandoverApplicationService.createHandoverApplication(
+        val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
-                flowNo = flowNo,
-                title = title,
                 applicant = removeMemberDTO.targetMember.id,
                 approver = removeMemberDTO.handoverTo!!.id,
                 handoverStatus = HandoverStatus.PENDING,
@@ -1369,7 +1357,7 @@ class RbacPermissionManageFacadeServiceImpl(
             ),
             details = handoverDetails
         )
-        return true
+        return flowNo
     }
 
     override fun deleteResourceGroupMembers(
@@ -1763,7 +1751,7 @@ class RbacPermissionManageFacadeServiceImpl(
 
     override fun handleHanoverApplication(request: HandoverOverviewUpdateReq): Boolean {
         val overview = permissionHandoverApplicationService.getHandoverOverview(request.flowNo)
-        logger.info("revoke hanover application:{}|{} ", request, overview)
+        logger.info("handle hanover application:{}|{} ", request, overview)
         HandleHandoverApplicationLock(redisOperation, request.flowNo).use { lock ->
             if (!lock.tryLock()) {
                 logger.warn("The handover application is being processed!$request")
@@ -1784,6 +1772,47 @@ class RbacPermissionManageFacadeServiceImpl(
                 logger.warn("handle hanover application error,$e|$request")
                 throw e
             }
+        }
+        return true
+    }
+
+    override fun batchHandleHanoverApplications(request: HandoverOverviewBatchUpdateReq): Boolean {
+        logger.info("batch handle hanover application:{} ", request)
+        val startEpoch = System.currentTimeMillis()
+        try {
+            val overviews = when {
+                request.allSelection -> permissionHandoverApplicationService.listHandoverOverviews(
+                    queryRequest = HandoverOverviewQueryReq(
+                        memberId = request.operator,
+                        approver = request.operator,
+                        handoverStatus = HandoverStatus.PENDING
+                    )
+                )
+
+                request.flowNos.isNotEmpty() -> permissionHandoverApplicationService.listHandoverOverviews(
+                    queryRequest = HandoverOverviewQueryReq(
+                        memberId = request.operator,
+                        approver = request.operator,
+                        handoverStatus = HandoverStatus.PENDING,
+                        flowNos = request.flowNos
+                    )
+                )
+
+                else -> return true
+            }.records
+            overviews.forEach { overview ->
+                handleHanoverApplication(
+                    request = HandoverOverviewUpdateReq(
+                        projectCode = overview.projectCode,
+                        flowNo = overview.flowNo,
+                        operator = request.operator,
+                        handoverAction = request.handoverAction,
+                        remark = request.remark
+                    )
+                )
+            }
+        } finally {
+            "It take(${System.currentTimeMillis() - startEpoch})ms to batch handle hanover applications"
         }
         return true
     }

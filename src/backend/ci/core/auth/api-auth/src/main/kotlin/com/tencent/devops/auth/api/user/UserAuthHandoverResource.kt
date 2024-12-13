@@ -1,6 +1,7 @@
 package com.tencent.devops.auth.api.user
 
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewBatchUpdateReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewQueryReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.request.ResourceType2CountOfHandoverQuery
@@ -41,7 +42,7 @@ interface UserAuthHandoverResource {
         projectId: String,
         @Parameter(description = "资源授权交接条件实体", required = true)
         condition: ResourceAuthorizationHandoverConditionRequest
-    ): Result<Boolean>
+    ): Result<String>
 
     @POST
     @Path("/listHandoverOverviews")
@@ -96,5 +97,16 @@ interface UserAuthHandoverResource {
         userId: String,
         @Parameter(description = "更新权限交接总览请求体", required = true)
         request: HandoverOverviewUpdateReq
+    ): Result<Boolean>
+
+    @POST
+    @Path("/batchHandleHanoverApplications")
+    @Operation(summary = "批量处理交接审批单")
+    fun batchHandleHanoverApplications(
+        @Parameter(description = "用户名", required = true)
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(description = "批量更新权限交接总览请求体", required = true)
+        request: HandoverOverviewBatchUpdateReq
     ): Result<Boolean>
 }

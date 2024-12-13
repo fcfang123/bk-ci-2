@@ -137,7 +137,7 @@ interface PermissionAuthorizationService {
         operator: String,
         projectCode: String,
         condition: ResourceAuthorizationHandoverConditionRequest
-    ): Boolean
+    ): String
 
     /**
      * 批量重置授权人--项目下全量

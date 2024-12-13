@@ -16,7 +16,10 @@ interface PermissionHandoverApplicationService {
     /**
      * 创建权限交接申请单
      * */
-    fun createHandoverApplication(overview: HandoverOverviewCreateDTO, details: List<HandoverDetailDTO>)
+    fun createHandoverApplication(
+        overview: HandoverOverviewCreateDTO,
+        details: List<HandoverDetailDTO>
+    ): String
 
     /**
      * 生成交接单标题

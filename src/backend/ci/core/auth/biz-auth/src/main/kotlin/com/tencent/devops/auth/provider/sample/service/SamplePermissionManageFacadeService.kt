@@ -13,6 +13,7 @@ import com.tencent.devops.auth.pojo.request.GroupMemberRemoveConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberRenewalConditionReq
 import com.tencent.devops.auth.pojo.request.GroupMemberSingleRenewalReq
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewBatchUpdateReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.request.ProjectMembersQueryConditionReq
 import com.tencent.devops.auth.pojo.request.RemoveMemberFromProjectReq
@@ -110,7 +111,7 @@ class SamplePermissionManageFacadeService : PermissionManageFacadeService {
         userId: String,
         projectCode: String,
         handoverMemberDTO: GroupMemberHandoverConditionReq
-    ): Boolean = true
+    ): String = ""
 
     override fun batchDeleteResourceGroupMembersFromManager(
         userId: String,
@@ -122,7 +123,7 @@ class SamplePermissionManageFacadeService : PermissionManageFacadeService {
         userId: String,
         projectCode: String,
         removeMemberDTO: GroupMemberRemoveConditionReq
-    ): Boolean = true
+    ): String? = null
 
     override fun deleteResourceGroupMembers(
         userId: String,
@@ -151,6 +152,8 @@ class SamplePermissionManageFacadeService : PermissionManageFacadeService {
     ): Boolean = true
 
     override fun handleHanoverApplication(request: HandoverOverviewUpdateReq): Boolean = true
+
+    override fun batchHandleHanoverApplications(request: HandoverOverviewBatchUpdateReq): Boolean = true
 
     override fun getResourceType2CountOfHandover(queryReq: ResourceType2CountOfHandoverQuery): List<ResourceType2CountVo> {
         return emptyList()

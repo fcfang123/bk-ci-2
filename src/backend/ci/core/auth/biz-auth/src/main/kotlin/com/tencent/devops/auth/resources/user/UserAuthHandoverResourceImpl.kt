@@ -3,6 +3,7 @@ package com.tencent.devops.auth.resources.user
 import com.tencent.devops.auth.api.user.UserAuthHandoverResource
 import com.tencent.devops.auth.pojo.enum.OperateChannel
 import com.tencent.devops.auth.pojo.request.HandoverDetailsQueryReq
+import com.tencent.devops.auth.pojo.request.HandoverOverviewBatchUpdateReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewQueryReq
 import com.tencent.devops.auth.pojo.request.HandoverOverviewUpdateReq
 import com.tencent.devops.auth.pojo.request.ResourceType2CountOfHandoverQuery
@@ -31,7 +32,7 @@ class UserAuthHandoverResourceImpl(
         userId: String,
         projectId: String,
         condition: ResourceAuthorizationHandoverConditionRequest
-    ): Result<Boolean> {
+    ): Result<String> {
         permissionResourceValidateService.validateUserProjectPermissionByChannel(
             userId = userId,
             projectCode = projectId,
@@ -89,5 +90,12 @@ class UserAuthHandoverResourceImpl(
             targetMemberId = request.operator
         )
         return Result(permissionManageFacadeService.handleHanoverApplication(request = request))
+    }
+
+    override fun batchHandleHanoverApplications(
+        userId: String,
+        request: HandoverOverviewBatchUpdateReq
+    ): Result<Boolean> {
+        return Result(permissionManageFacadeService.batchHandleHanoverApplications(request = request))
     }
 }
