@@ -140,6 +140,7 @@ class AuthHandoverOverviewDao {
             queryRequest.projectCode?.let { conditions.add(PROJECT_CODE.eq(queryRequest.projectCode)) }
             queryRequest.title?.let { conditions.add(TITLE.like("%${queryRequest.title}%")) }
             queryRequest.flowNo?.let { conditions.add(FLOW_NO.eq(queryRequest.flowNo)) }
+            queryRequest.flowNos?.let { conditions.add(FLOW_NO.`in`(queryRequest.flowNo)) }
             queryRequest.applicant?.let { conditions.add(APPLICANT.like("%${queryRequest.applicant}%")) }
             queryRequest.approver?.let { conditions.add(APPROVER.like("%${queryRequest.approver}%")) }
             queryRequest.handoverStatus?.let { conditions.add(STATUS.eq(queryRequest.handoverStatus!!.value)) }
