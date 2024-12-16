@@ -1,6 +1,8 @@
 package com.tencent.devops.auth.provider.rbac.service
 
-import com.tencent.devops.auth.constant.AuthI18nConstants
+import com.tencent.devops.auth.constant.AuthI18nConstants.BK_APPLY_TO_HANDOVER
+import com.tencent.devops.auth.constant.AuthI18nConstants.BK_HANDOVER_AUTHORIZATIONS
+import com.tencent.devops.auth.constant.AuthI18nConstants.BK_HANDOVER_GROUPS
 import com.tencent.devops.auth.constant.AuthMessageCode
 import com.tencent.devops.auth.dao.AuthAuthorizationDao
 import com.tencent.devops.auth.dao.AuthHandoverDetailDao
@@ -22,13 +24,19 @@ import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.model.SQLPage
 import com.tencent.devops.common.api.util.DateTimeUtil
 import com.tencent.devops.common.api.util.PageUtil
+import com.tencent.devops.common.auth.api.ResourceTypeId
 import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationConditionRequest
+import com.tencent.devops.common.client.Client
+import com.tencent.devops.common.notify.enums.NotifyType
 import com.tencent.devops.common.redis.RedisOperation
 import com.tencent.devops.common.web.utils.I18nUtil
+import com.tencent.devops.notify.api.service.ServiceNotifyMessageTemplateResource
+import com.tencent.devops.notify.pojo.SendNotifyMessageTemplateRequest
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
+
 
 class RbacPermissionHandoverApplicationService(
     private val dslContext: DSLContext,
@@ -37,7 +45,9 @@ class RbacPermissionHandoverApplicationService(
     private val authorizationDao: AuthAuthorizationDao,
     private val authResourceGroupDao: AuthResourceGroupDao,
     private val rbacCacheService: RbacCacheService,
-    private val redisOperation: RedisOperation
+    private val redisOperation: RedisOperation,
+    private val authResourceService: AuthResourceService,
+    private val client: Client
 ) : PermissionHandoverApplicationService {
     override fun createHandoverApplication(
         overview: HandoverOverviewCreateDTO,
@@ -45,10 +55,11 @@ class RbacPermissionHandoverApplicationService(
     ): String {
         logger.info("create handover application:{}|{}", overview, details)
         val flowNo = generateFlowNo()
-        val title = generateTitle(
+
+        val title = generateOverviewContent(
             groupCount = overview.groupCount,
             authorizationCount = overview.authorizationCount
-        )
+        ).first
         dslContext.transaction { configuration ->
             val transactionContext = DSL.using(configuration)
             handoverOverviewDao.create(
@@ -63,33 +74,79 @@ class RbacPermissionHandoverApplicationService(
                 handoverDetailDTOs = details.map { it.copy(flowNo = flowNo) }
             )
         }
-        // todo 发送邮件/devops-notices通知
+
+        val projectName = authResourceService.get(
+            projectCode = overview.projectCode,
+            resourceType = ResourceTypeId.PROJECT,
+            resourceCode = overview.projectCode
+        )
+        val handoverOverview = getHandoverOverview(flowNo)
+        val resourceType2CountOfHandover = getResourceType2CountOfHandoverApplication(flowNo)
+
+        val handoverOverviewContentOfEmail = generateOverviewContent(
+            groupCount = handoverOverview.groupCount,
+            authorizationCount = handoverOverview.authorizationCount
+        ).second
+        val handoverOverviewTableBuilder = StringBuilder()
+        resourceType2CountOfHandover.forEach {
+            handoverOverviewTableBuilder.append(
+                java.lang.String.format(
+                    HANDOVER_APPLICATION_TABLE_OF_EMAIL, it.type.alias, it.resourceType, it.count
+                )
+            )
+        }
+        val handoverOverviewTable = handoverOverviewTableBuilder.toString()
+        val bodyParams = mapOf(
+            "handoverFrom" to overview.applicant,
+            "handoverTo" to overview.approver,
+            "projectName" to projectName.resourceName,
+            "handoverOverviews" to handoverOverviewContentOfEmail,
+            "handoverOverviewContentOfRtx" to title,
+            "table" to handoverOverviewTable
+        )
+        // 发邮件
+        val request = SendNotifyMessageTemplateRequest(
+            templateCode = TEMPLATE_CODE,
+            bodyParams = bodyParams,
+            titleParams = bodyParams,
+            notifyType = mutableSetOf(NotifyType.RTX.name, NotifyType.EMAIL.name),
+            receivers = mutableSetOf(overview.approver)
+        )
+        kotlin.runCatching {
+            client.get(ServiceNotifyMessageTemplateResource::class).sendNotifyMessageByTemplate(request)
+        }.onFailure {
+            logger.warn("notify email fail ${it.message}|$bodyParams|${overview.approver}")
+        }
         return flowNo
     }
 
-    override fun generateTitle(
+    private fun generateOverviewContent(
         groupCount: Int,
         authorizationCount: Int
-    ): String {
-        return I18nUtil.getCodeLanMessage(messageCode = AuthI18nConstants.BK_APPLY_TO_HANDOVER).let {
-            when {
-                groupCount > 0 && authorizationCount > 0 -> {
-                    it.plus(I18nUtil.getCodeLanMessage(AuthI18nConstants.BK_HANDOVER_GROUPS, params = arrayOf(groupCount.toString()))).plus(",").plus(
-                        I18nUtil.getCodeLanMessage(AuthI18nConstants.BK_HANDOVER_AUTHORIZATIONS, params = arrayOf(authorizationCount.toString()))
-                    )
-                }
+    ): Pair<String, String> {
+        val bkHandoverGroups = I18nUtil.getCodeLanMessage(BK_HANDOVER_GROUPS)
+        val bkHandoverAuthorizations = I18nUtil.getCodeLanMessage(BK_HANDOVER_AUTHORIZATIONS)
+        var titleOfApplication = I18nUtil.getCodeLanMessage(BK_APPLY_TO_HANDOVER)
+        var handoverOverviewContentOfEmail = ""
 
-                groupCount > 0 -> {
-                    it.plus(I18nUtil.getCodeLanMessage(AuthI18nConstants.BK_HANDOVER_GROUPS, params = arrayOf(groupCount.toString())))
-                }
+        when {
+            groupCount > 0 && authorizationCount > 0 -> {
+                titleOfApplication.plus(groupCount).plus(bkHandoverGroups.plus(",").plus(authorizationCount).plus(bkHandoverAuthorizations))
+                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups,
+                    |<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+            }
 
-                else -> {
-                    it.plus(
-                        I18nUtil.getCodeLanMessage(AuthI18nConstants.BK_HANDOVER_AUTHORIZATIONS, params = arrayOf(authorizationCount.toString()))
-                    )
-                }
+            groupCount > 0 -> {
+                titleOfApplication.plus(groupCount).plus(bkHandoverGroups)
+                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups""".trimMargin()
+            }
+
+            else -> {
+                titleOfApplication.plus(authorizationCount).plus(bkHandoverAuthorizations)
+                handoverOverviewContentOfEmail = """<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
             }
         }
+        return Pair(titleOfApplication, handoverOverviewContentOfEmail)
     }
 
     /**
@@ -301,5 +358,7 @@ class RbacPermissionHandoverApplicationService(
         private val logger = LoggerFactory.getLogger(RbacPermissionHandoverApplicationService::class.java)
         private const val FLOW_NO_PREFIX = "REQ"
         private const val FLOW_NO_KEY = "AUTH:HANDOVER:FLOW:NO:%s"
+        private const val HANDOVER_APPLICATION_TABLE_OF_EMAIL = "<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+        private const val TEMPLATE_CODE = "BK_PERMISSIONS_HANDOVER_APPLICATION"
     }
 }

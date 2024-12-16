@@ -22,11 +22,6 @@ interface PermissionHandoverApplicationService {
     ): String
 
     /**
-     * 生成交接单标题
-     * */
-    fun generateTitle(groupCount: Int, authorizationCount: Int): String
-
-    /**
      * 生成流程单号
      * */
     fun generateFlowNo(): String

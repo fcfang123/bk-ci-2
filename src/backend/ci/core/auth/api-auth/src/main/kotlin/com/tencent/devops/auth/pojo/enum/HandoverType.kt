@@ -1,11 +1,11 @@
 package com.tencent.devops.auth.pojo.enum
 
-enum class HandoverType(val value: String) {
+enum class HandoverType(val value: String, val alias: String) {
     // 用户组
-    GROUP("group"),
+    GROUP("group", "用户组"),
 
     // 授权
-    AUTHORIZATION("authorization");
+    AUTHORIZATION("authorization", "授权管理");
 
     companion object {
         fun get(value: String): HandoverType {

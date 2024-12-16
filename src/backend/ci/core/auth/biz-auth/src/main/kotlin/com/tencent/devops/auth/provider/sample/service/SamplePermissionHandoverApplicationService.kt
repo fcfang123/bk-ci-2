@@ -20,8 +20,6 @@ class SamplePermissionHandoverApplicationService : PermissionHandoverApplication
         return ""
     }
 
-    override fun generateTitle(groupCount: Int, authorizationCount: Int): String = ""
-
     override fun generateFlowNo(): String = ""
 
     override fun updateHandoverApplication(overview: HandoverOverviewUpdateReq) {
