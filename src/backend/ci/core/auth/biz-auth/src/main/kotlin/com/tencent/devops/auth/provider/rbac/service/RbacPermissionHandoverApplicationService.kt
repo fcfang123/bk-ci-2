@@ -1,5 +1,6 @@
 package com.tencent.devops.auth.provider.rbac.service
 
+import com.tencent.bk.sdk.iam.constants.ManagerScopesEnum
 import com.tencent.devops.auth.constant.AuthI18nConstants.BK_APPLY_TO_HANDOVER
 import com.tencent.devops.auth.constant.AuthI18nConstants.BK_HANDOVER_AUTHORIZATIONS
 import com.tencent.devops.auth.constant.AuthI18nConstants.BK_HANDOVER_GROUPS
@@ -19,6 +20,7 @@ import com.tencent.devops.auth.pojo.vo.HandoverAuthorizationDetailVo
 import com.tencent.devops.auth.pojo.vo.HandoverGroupDetailVo
 import com.tencent.devops.auth.pojo.vo.HandoverOverviewVo
 import com.tencent.devops.auth.pojo.vo.ResourceType2CountVo
+import com.tencent.devops.auth.service.DeptService
 import com.tencent.devops.auth.service.iam.PermissionHandoverApplicationService
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.model.SQLPage
@@ -29,6 +31,7 @@ import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationConditionReq
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.notify.enums.NotifyType
 import com.tencent.devops.common.redis.RedisOperation
+import com.tencent.devops.common.service.config.CommonConfig
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.notify.api.service.ServiceNotifyMessageTemplateResource
 import com.tencent.devops.notify.pojo.SendNotifyMessageTemplateRequest
@@ -47,7 +50,9 @@ class RbacPermissionHandoverApplicationService(
     private val rbacCacheService: RbacCacheService,
     private val redisOperation: RedisOperation,
     private val authResourceService: AuthResourceService,
-    private val client: Client
+    private val client: Client,
+    private val config: CommonConfig,
+    private val deptService: DeptService
 ) : PermissionHandoverApplicationService {
     override fun createHandoverApplication(
         overview: HandoverOverviewCreateDTO,
@@ -55,7 +60,6 @@ class RbacPermissionHandoverApplicationService(
     ): String {
         logger.info("create handover application:{}|{}", overview, details)
         val flowNo = generateFlowNo()
-
         val title = generateOverviewContent(
             groupCount = overview.groupCount,
             authorizationCount = overview.authorizationCount
@@ -74,6 +78,8 @@ class RbacPermissionHandoverApplicationService(
                 handoverDetailDTOs = details.map { it.copy(flowNo = flowNo) }
             )
         }
+        val handoverFromCnName = deptService.getMemberInfo(overview.applicant, ManagerScopesEnum.USER).displayName
+        val handoverToCnName = deptService.getMemberInfo(overview.approver, ManagerScopesEnum.USER).displayName
 
         val projectName = authResourceService.get(
             projectCode = overview.projectCode,
@@ -91,18 +97,19 @@ class RbacPermissionHandoverApplicationService(
         resourceType2CountOfHandover.forEach {
             handoverOverviewTableBuilder.append(
                 java.lang.String.format(
-                    HANDOVER_APPLICATION_TABLE_OF_EMAIL, it.type.alias, it.resourceType, it.count
+                    HANDOVER_APPLICATION_TABLE_OF_EMAIL, it.type.alias, it.resourceTypeName, it.count
                 )
             )
         }
         val handoverOverviewTable = handoverOverviewTableBuilder.toString()
         val bodyParams = mapOf(
-            "handoverFrom" to overview.applicant,
-            "handoverTo" to overview.approver,
+            "handoverFrom" to overview.applicant.plus("（$handoverFromCnName）"),
+            "handoverTo" to overview.approver.plus("（$handoverToCnName）"),
             "projectName" to projectName.resourceName,
             "handoverOverviews" to handoverOverviewContentOfEmail,
             "handoverOverviewContentOfRtx" to title,
-            "table" to handoverOverviewTable
+            "table" to handoverOverviewTable,
+            "url" to handoverApplicationUrl
         )
         // 发邮件
         val request = SendNotifyMessageTemplateRequest(
@@ -131,18 +138,20 @@ class RbacPermissionHandoverApplicationService(
 
         when {
             groupCount > 0 && authorizationCount > 0 -> {
-                titleOfApplication.plus(groupCount).plus(bkHandoverGroups.plus(",").plus(authorizationCount).plus(bkHandoverAuthorizations))
+                titleOfApplication = titleOfApplication.plus(groupCount).plus(
+                    bkHandoverGroups.plus(",").plus(authorizationCount).plus(bkHandoverAuthorizations)
+                )
                 handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups,
                     |<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
             }
 
             groupCount > 0 -> {
-                titleOfApplication.plus(groupCount).plus(bkHandoverGroups)
+                titleOfApplication = titleOfApplication.plus(groupCount).plus(bkHandoverGroups)
                 handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups""".trimMargin()
             }
 
             else -> {
-                titleOfApplication.plus(authorizationCount).plus(bkHandoverAuthorizations)
+                titleOfApplication = titleOfApplication.plus(authorizationCount).plus(bkHandoverAuthorizations)
                 handoverOverviewContentOfEmail = """<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
             }
         }
@@ -354,11 +363,14 @@ class RbacPermissionHandoverApplicationService(
         ).map { it.copy(approver = flowNo2Approver[it.flowNo]) }
     }
 
+    private val handoverApplicationUrl = "${config.devopsHostGateway}/console/permission/my-handover"
+
     companion object {
         private val logger = LoggerFactory.getLogger(RbacPermissionHandoverApplicationService::class.java)
         private const val FLOW_NO_PREFIX = "REQ"
         private const val FLOW_NO_KEY = "AUTH:HANDOVER:FLOW:NO:%s"
         private const val HANDOVER_APPLICATION_TABLE_OF_EMAIL = "<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
         private const val TEMPLATE_CODE = "BK_PERMISSIONS_HANDOVER_APPLICATION"
+
     }
 }

@@ -624,7 +624,8 @@ class RbacAuthConfiguration {
         rbacCacheService: RbacCacheService,
         redisOperation: RedisOperation,
         authResourceService: AuthResourceService,
-        client: Client
+        client: Client,
+        config: CommonConfig
     ) = RbacPermissionHandoverApplicationService(
         dslContext = dslContext,
         handoverOverviewDao = handoverOverviewDao,
@@ -634,7 +635,8 @@ class RbacAuthConfiguration {
         rbacCacheService = rbacCacheService,
         redisOperation = redisOperation,
         authResourceService = authResourceService,
-        client = client
+        client = client,
+        config = config
     )
 
     @Bean
