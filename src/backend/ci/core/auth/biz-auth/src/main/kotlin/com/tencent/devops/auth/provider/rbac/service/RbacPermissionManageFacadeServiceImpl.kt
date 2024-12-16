@@ -1056,6 +1056,7 @@ class RbacPermissionManageFacadeServiceImpl(
                 errorCode = AuthMessageCode.GROUP_NOT_EXIST
             )
         }
+        // todo 需要过滤掉审核中的用户组
         val resourceGroups = authResourceGroupDao.listByRelationId(
             dslContext = dslContext,
             projectCode = projectCode,
@@ -1252,6 +1253,7 @@ class RbacPermissionManageFacadeServiceImpl(
             projectCode = projectCode,
             commonCondition = removeMemberDTO
         )[MemberType.USER] ?: return null
+        // todo 需要过滤掉审核中的用户组
         // 获取导致流水线代持人权限受到影响的用户组及流水线
         val (invalidGroups, invalidPipelines, invalidRepertoryIds) =
             listInvalidAuthorizationsAfterOperatedGroups(
