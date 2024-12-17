@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 data class HandoverOverviewCreateDTO(
     @get:Schema(title = "项目ID")
     val projectCode: String,
+    @get:Schema(title = "项目名称")
+    val projectName: String,
     @get:Schema(title = "项目ID")
     var title: String? = null,
     @get:Schema(title = "流程单号")

@@ -138,6 +138,7 @@ class AuthHandoverOverviewDao {
             val conditions = mutableListOf<Condition>()
             conditions.add(APPROVER.eq(queryRequest.memberId).or(APPLICANT.eq(queryRequest.memberId)))
             queryRequest.projectCode?.let { conditions.add(PROJECT_CODE.eq(queryRequest.projectCode)) }
+            queryRequest.projectName?.let { conditions.add(PROJECT_NAME.like("%${queryRequest.projectName}%")) }
             queryRequest.title?.let { conditions.add(TITLE.like("%${queryRequest.title}%")) }
             queryRequest.flowNo?.let { conditions.add(FLOW_NO.eq(queryRequest.flowNo)) }
             queryRequest.flowNos?.let { conditions.add(FLOW_NO.`in`(queryRequest.flowNos)) }
@@ -154,6 +155,7 @@ class AuthHandoverOverviewDao {
         return HandoverOverviewVo(
             id = id,
             projectCode = projectCode,
+            projectName = projectName,
             title = title,
             flowNo = flowNo,
             applicant = applicant,

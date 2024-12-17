@@ -10,6 +10,8 @@ data class HandoverOverviewVo(
     val id: Long,
     @get:Schema(title = "项目ID")
     val projectCode: String,
+    @get:Schema(title = "项目名称")
+    val projectName: String,
     @get:Schema(title = "标题")
     val title: String,
     @get:Schema(title = "流程单号")

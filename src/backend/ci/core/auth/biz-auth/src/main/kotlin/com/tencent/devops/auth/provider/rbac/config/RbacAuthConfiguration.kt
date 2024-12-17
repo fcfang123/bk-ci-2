@@ -218,7 +218,8 @@ class RbacAuthConfiguration {
         permissionHandoverApplicationService: PermissionHandoverApplicationService,
         rbacCacheService: RbacCacheService,
         redisOperation: RedisOperation,
-        authorizationDao: AuthAuthorizationDao
+        authorizationDao: AuthAuthorizationDao,
+        authResourceService: AuthResourceService
     ) = RbacPermissionManageFacadeServiceImpl(
         permissionResourceGroupService = permissionResourceGroupService,
         groupPermissionService = groupPermissionService,
@@ -234,7 +235,8 @@ class RbacAuthConfiguration {
         permissionHandoverApplicationService = permissionHandoverApplicationService,
         rbacCacheService = rbacCacheService,
         redisOperation = redisOperation,
-        authorizationDao = authorizationDao
+        authorizationDao = authorizationDao,
+        authResourceService = authResourceService
     )
 
     @Bean
@@ -623,7 +625,6 @@ class RbacAuthConfiguration {
         authResourceGroupDao: AuthResourceGroupDao,
         rbacCacheService: RbacCacheService,
         redisOperation: RedisOperation,
-        authResourceService: AuthResourceService,
         client: Client,
         config: CommonConfig,
         deptService: DeptService
@@ -635,7 +636,6 @@ class RbacAuthConfiguration {
         authResourceGroupDao = authResourceGroupDao,
         rbacCacheService = rbacCacheService,
         redisOperation = redisOperation,
-        authResourceService = authResourceService,
         client = client,
         config = config,
         deptService = deptService

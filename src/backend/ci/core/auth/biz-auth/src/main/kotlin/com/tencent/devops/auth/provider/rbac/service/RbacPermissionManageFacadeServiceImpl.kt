@@ -98,7 +98,8 @@ class RbacPermissionManageFacadeServiceImpl(
     private val permissionHandoverApplicationService: PermissionHandoverApplicationService,
     private val rbacCacheService: RbacCacheService,
     private val redisOperation: RedisOperation,
-    private val authorizationDao: AuthAuthorizationDao
+    private val authorizationDao: AuthAuthorizationDao,
+    private val authResourceService: AuthResourceService
 ) : PermissionManageFacadeService {
     override fun getMemberGroupsDetails(
         projectId: String,
@@ -1119,10 +1120,16 @@ class RbacPermissionManageFacadeServiceImpl(
                 )
             )
         }
+        val projectName = authResourceService.get(
+            projectCode = projectCode,
+            resourceType = ResourceTypeId.PROJECT,
+            resourceCode = projectCode
+        ).resourceName
         // 创建交接单
         val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
+                projectName = projectName,
                 applicant = handoverMemberDTO.targetMember.id,
                 approver = handoverMemberDTO.handoverTo.id,
                 handoverStatus = HandoverStatus.PENDING,
@@ -1364,9 +1371,15 @@ class RbacPermissionManageFacadeServiceImpl(
                 )
             }
         }
+        val projectName = authResourceService.get(
+            projectCode = projectCode,
+            resourceType = ResourceTypeId.PROJECT,
+            resourceCode = projectCode
+        ).resourceName
         val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
+                projectName = projectName,
                 applicant = removeMemberDTO.targetMember.id,
                 approver = removeMemberDTO.handoverTo!!.id,
                 handoverStatus = HandoverStatus.PENDING,

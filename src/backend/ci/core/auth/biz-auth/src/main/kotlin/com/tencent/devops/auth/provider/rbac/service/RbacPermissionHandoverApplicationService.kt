@@ -49,7 +49,6 @@ class RbacPermissionHandoverApplicationService(
     private val authResourceGroupDao: AuthResourceGroupDao,
     private val rbacCacheService: RbacCacheService,
     private val redisOperation: RedisOperation,
-    private val authResourceService: AuthResourceService,
     private val client: Client,
     private val config: CommonConfig,
     private val deptService: DeptService
@@ -80,12 +79,6 @@ class RbacPermissionHandoverApplicationService(
         }
         val handoverFromCnName = deptService.getMemberInfo(overview.applicant, ManagerScopesEnum.USER).displayName
         val handoverToCnName = deptService.getMemberInfo(overview.approver, ManagerScopesEnum.USER).displayName
-
-        val projectName = authResourceService.get(
-            projectCode = overview.projectCode,
-            resourceType = ResourceTypeId.PROJECT,
-            resourceCode = overview.projectCode
-        )
         val handoverOverview = getHandoverOverview(flowNo)
         val resourceType2CountOfHandover = getResourceType2CountOfHandoverApplication(flowNo)
 
@@ -105,7 +98,7 @@ class RbacPermissionHandoverApplicationService(
         val bodyParams = mapOf(
             "handoverFrom" to overview.applicant.plus("（$handoverFromCnName）"),
             "handoverTo" to overview.approver.plus("（$handoverToCnName）"),
-            "projectName" to projectName.resourceName,
+            "projectName" to overview.projectName,
             "handoverOverviews" to handoverOverviewContentOfEmail,
             "handoverOverviewContentOfRtx" to title,
             "table" to handoverOverviewTable,

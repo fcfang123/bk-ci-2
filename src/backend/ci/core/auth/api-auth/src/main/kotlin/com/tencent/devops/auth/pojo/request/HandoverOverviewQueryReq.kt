@@ -11,6 +11,8 @@ data class HandoverOverviewQueryReq(
     val memberId: String,
     @get:Schema(title = "项目ID")
     val projectCode: String? = null,
+    @get:Schema(title = "项目名称")
+    val projectName: String? = null,
     @get:Schema(title = "项目ID")
     val title: String? = null,
     @get:Schema(title = "流程单号")
