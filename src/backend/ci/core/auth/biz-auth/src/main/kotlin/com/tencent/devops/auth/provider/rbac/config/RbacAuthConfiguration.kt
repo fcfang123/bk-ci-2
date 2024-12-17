@@ -401,11 +401,15 @@ class RbacAuthConfiguration {
     fun rbacPermissionResourceValidateService(
         permissionService: PermissionService,
         rbacCacheService: RbacCacheService,
-        client: Client
+        client: Client,
+        authAuthorizationDao: AuthAuthorizationDao,
+        dslContext: DSLContext
     ) = RbacPermissionResourceValidateService(
         permissionService = permissionService,
         rbacCacheService = rbacCacheService,
-        client = client
+        client = client,
+        authAuthorizationDao = authAuthorizationDao,
+        dslContext = dslContext
     )
 
     @Bean

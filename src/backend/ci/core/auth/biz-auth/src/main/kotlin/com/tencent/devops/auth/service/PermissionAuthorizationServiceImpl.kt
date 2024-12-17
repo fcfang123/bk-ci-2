@@ -196,6 +196,19 @@ class PermissionAuthorizationServiceImpl(
         return true
     }
 
+    override fun isUserHasProjectAuthorizations(
+        projectCode: String,
+        userId: String
+    ): Boolean {
+        return authAuthorizationDao.count(
+            dslContext = dslContext,
+            condition = ResourceAuthorizationConditionRequest(
+                projectCode = projectCode,
+                handoverFrom = userId
+            )
+        ) > 0
+    }
+
     override fun deleteResourceAuthorization(
         projectCode: String,
         resourceType: String,

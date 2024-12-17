@@ -29,6 +29,7 @@
 package com.tencent.devops.auth.provider.rbac.service
 
 import com.tencent.devops.auth.constant.AuthMessageCode
+import com.tencent.devops.auth.dao.AuthAuthorizationDao
 import com.tencent.devops.auth.pojo.dto.PermissionBatchValidateDTO
 import com.tencent.devops.auth.pojo.enum.OperateChannel
 import com.tencent.devops.auth.service.iam.PermissionResourceValidateService
@@ -38,6 +39,7 @@ import com.tencent.devops.common.api.exception.PermissionForbiddenException
 import com.tencent.devops.common.api.util.Watcher
 import com.tencent.devops.common.auth.api.AuthPermission
 import com.tencent.devops.common.auth.api.AuthResourceType
+import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationConditionRequest
 import com.tencent.devops.common.auth.rbac.utils.RbacAuthUtils
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.service.utils.LogUtils
@@ -45,13 +47,16 @@ import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.project.api.service.ServiceProjectResource
 import com.tencent.devops.project.constant.ProjectMessageCode
 import com.tencent.devops.project.pojo.enums.ProjectApproveStatus
+import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import javax.ws.rs.NotFoundException
 
 class RbacPermissionResourceValidateService(
     private val permissionService: PermissionService,
     private val rbacCacheService: RbacCacheService,
-    private val client: Client
+    private val client: Client,
+    private val authAuthorizationDao: AuthAuthorizationDao,
+    private val dslContext: DSLContext
 ) : PermissionResourceValidateService {
 
     companion object {
@@ -167,7 +172,16 @@ class RbacPermissionResourceValidateService(
                 action = RbacAuthUtils.buildAction(AuthPermission.VISIT, AuthResourceType.PROJECT),
                 projectCode = projectCode
             )
-            if (!hasVisitPermission) {
+            if (hasVisitPermission) return
+
+            val isUserHasProjectAuthorizations = authAuthorizationDao.count(
+                dslContext = dslContext,
+                condition = ResourceAuthorizationConditionRequest(
+                    projectCode = projectCode,
+                    handoverFrom = userId,
+                )
+            ) > 0
+            if (!isUserHasProjectAuthorizations) {
                 throw PermissionForbiddenException(
                     message = "The user does not have permission to visit the project!"
                 )

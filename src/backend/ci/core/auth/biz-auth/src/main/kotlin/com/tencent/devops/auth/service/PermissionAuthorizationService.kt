@@ -97,6 +97,14 @@ interface PermissionAuthorizationService {
     ): Boolean
 
     /**
+     * 是否用户拥有项目下授权
+     */
+    fun isUserHasProjectAuthorizations(
+        projectCode: String,
+        userId: String
+    ): Boolean
+
+    /**
      * 删除资源授权管理
      */
     fun deleteResourceAuthorization(

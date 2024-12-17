@@ -128,7 +128,7 @@ class RbacPermissionHandoverApplicationService(
                 titleOfApplication = titleOfApplication.plus(groupCount).plus(
                     bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
                 )
-                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups,<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups，<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
                 handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(groupCount).plus(
                     bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
                 )
