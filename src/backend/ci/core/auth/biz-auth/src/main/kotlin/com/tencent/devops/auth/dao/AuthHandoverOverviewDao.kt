@@ -27,6 +27,7 @@ class AuthHandoverOverviewDao {
             dslContext.insertInto(
                 this,
                 PROJECT_CODE,
+                PROJECT_NAME,
                 TITLE,
                 FLOW_NO,
                 APPLICANT,
@@ -37,6 +38,7 @@ class AuthHandoverOverviewDao {
                 REMARK
             ).values(
                 overviewDTO.projectCode,
+                overviewDTO.projectName,
                 overviewDTO.title,
                 overviewDTO.flowNo,
                 overviewDTO.applicant,

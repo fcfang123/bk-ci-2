@@ -123,8 +123,6 @@ class RbacPermissionHandoverApplicationService(
         var titleOfApplication = I18nUtil.getCodeLanMessage(BK_APPLY_TO_HANDOVER)
         var handoverOverviewContentOfEmail = ""
         var handoverOverviewContentOfRtx = ""
-
-
         when {
             groupCount > 0 && authorizationCount > 0 -> {
                 titleOfApplication = titleOfApplication.plus(groupCount).plus(
