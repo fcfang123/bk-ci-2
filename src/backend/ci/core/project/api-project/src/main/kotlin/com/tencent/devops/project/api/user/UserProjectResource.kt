@@ -89,10 +89,7 @@ interface UserProjectResource {
         sortType: ProjectSortType?,
         @Parameter(description = "排序规则", required = false)
         @QueryParam("collation")
-        collation: ProjectCollation?,
-        @Parameter(description = "是否查询授权相关项目", required = false)
-        @QueryParam("queryAuthorization")
-        queryAuthorization: Boolean?
+        collation: ProjectCollation?
     ): Result<List<ProjectVO>>
 
     @GET

@@ -69,8 +69,7 @@ class UserProjectResourceImpl @Autowired constructor(
         enabled: Boolean?,
         unApproved: Boolean?,
         sortType: ProjectSortType?,
-        collation: ProjectCollation?,
-        queryAuthorization: Boolean?
+        collation: ProjectCollation?
     ): Result<List<ProjectVO>> {
         return Result(
             projectService.list(
@@ -79,8 +78,7 @@ class UserProjectResourceImpl @Autowired constructor(
                 enabled = enabled,
                 unApproved = unApproved ?: false,
                 sortType = sortType ?: ProjectSortType.PROJECT_NAME,
-                collation = collation ?: ProjectCollation.DEFAULT,
-                queryAuthorization = queryAuthorization
+                collation = collation ?: ProjectCollation.DEFAULT
             )
         )
     }
