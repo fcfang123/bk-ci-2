@@ -26,7 +26,6 @@ import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.model.SQLPage
 import com.tencent.devops.common.api.util.DateTimeUtil
 import com.tencent.devops.common.api.util.PageUtil
-import com.tencent.devops.common.auth.api.ResourceTypeId
 import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationConditionRequest
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.notify.enums.NotifyType
@@ -59,10 +58,11 @@ class RbacPermissionHandoverApplicationService(
     ): String {
         logger.info("create handover application:{}|{}", overview, details)
         val flowNo = generateFlowNo()
-        val title = generateOverviewContent(
-            groupCount = overview.groupCount,
-            authorizationCount = overview.authorizationCount
-        ).first
+        val (title, handoverOverviewContentOfEmail, handoverOverviewContentOfRtx) =
+            generateOverviewContent(
+                groupCount = overview.groupCount,
+                authorizationCount = overview.authorizationCount
+            )
         dslContext.transaction { configuration ->
             val transactionContext = DSL.using(configuration)
             handoverOverviewDao.create(
@@ -79,13 +79,7 @@ class RbacPermissionHandoverApplicationService(
         }
         val handoverFromCnName = deptService.getMemberInfo(overview.applicant, ManagerScopesEnum.USER).displayName
         val handoverToCnName = deptService.getMemberInfo(overview.approver, ManagerScopesEnum.USER).displayName
-        val handoverOverview = getHandoverOverview(flowNo)
         val resourceType2CountOfHandover = getResourceType2CountOfHandoverApplication(flowNo)
-
-        val handoverOverviewContentOfEmail = generateOverviewContent(
-            groupCount = handoverOverview.groupCount,
-            authorizationCount = handoverOverview.authorizationCount
-        ).second
         val handoverOverviewTableBuilder = StringBuilder()
         resourceType2CountOfHandover.forEach {
             handoverOverviewTableBuilder.append(
@@ -100,7 +94,7 @@ class RbacPermissionHandoverApplicationService(
             "handoverTo" to overview.approver.plus("（$handoverToCnName）"),
             "projectName" to overview.projectName,
             "handoverOverviews" to handoverOverviewContentOfEmail,
-            "handoverOverviewContentOfRtx" to title,
+            "handoverOverviewContentOfRtx" to handoverOverviewContentOfRtx,
             "table" to handoverOverviewTable,
             "url" to handoverApplicationUrl
         )
@@ -123,11 +117,13 @@ class RbacPermissionHandoverApplicationService(
     private fun generateOverviewContent(
         groupCount: Int,
         authorizationCount: Int
-    ): Pair<String, String> {
+    ): Triple<String, String, String> {
         val bkHandoverGroups = I18nUtil.getCodeLanMessage(BK_HANDOVER_GROUPS)
         val bkHandoverAuthorizations = I18nUtil.getCodeLanMessage(BK_HANDOVER_AUTHORIZATIONS)
         var titleOfApplication = I18nUtil.getCodeLanMessage(BK_APPLY_TO_HANDOVER)
         var handoverOverviewContentOfEmail = ""
+        var handoverOverviewContentOfRtx = ""
+
 
         when {
             groupCount > 0 && authorizationCount > 0 -> {
@@ -135,19 +131,24 @@ class RbacPermissionHandoverApplicationService(
                     bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
                 )
                 handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups,<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+                handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(groupCount).plus(
+                    bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
+                )
             }
 
             groupCount > 0 -> {
                 titleOfApplication = titleOfApplication.plus(groupCount).plus(bkHandoverGroups)
                 handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups""".trimMargin()
+                handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(groupCount).plus(bkHandoverGroups)
             }
 
             else -> {
                 titleOfApplication = titleOfApplication.plus(authorizationCount).plus(bkHandoverAuthorizations)
                 handoverOverviewContentOfEmail = """<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+                handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(authorizationCount).plus(bkHandoverAuthorizations)
             }
         }
-        return Pair(titleOfApplication, handoverOverviewContentOfEmail)
+        return Triple(titleOfApplication, handoverOverviewContentOfEmail, handoverOverviewContentOfRtx)
     }
 
     /**
