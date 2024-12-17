@@ -1050,13 +1050,21 @@ class RbacPermissionManageFacadeServiceImpl(
         val groupIds = getGroupIdsByGroupMemberCondition(
             projectCode = projectCode,
             commonCondition = handoverMemberDTO
-        )[MemberType.get(MemberType.USER.type)]
+        )[MemberType.get(MemberType.USER.type)]?.toMutableList()
         if (groupIds.isNullOrEmpty()) {
             throw ErrorCodeException(
                 errorCode = AuthMessageCode.GROUP_NOT_EXIST
             )
         }
-        // todo 需要过滤掉审核中的用户组
+
+        // 过滤掉审核中的用户组
+        val beingHandoverGroups = permissionHandoverApplicationService.listMemberHandoverDetails(
+            projectCode = projectCode,
+            memberId = handoverMemberDTO.targetMember.id,
+            handoverType = HandoverType.GROUP
+        ).map { it.itemId.toInt() }
+        groupIds.removeAll(beingHandoverGroups)
+
         val resourceGroups = authResourceGroupDao.listByRelationId(
             dslContext = dslContext,
             projectCode = projectCode,
@@ -1252,8 +1260,16 @@ class RbacPermissionManageFacadeServiceImpl(
         val groupIds = getGroupIdsByGroupMemberCondition(
             projectCode = projectCode,
             commonCondition = removeMemberDTO
-        )[MemberType.USER] ?: return null
-        // todo 需要过滤掉审核中的用户组
+        )[MemberType.USER]?.toMutableList() ?: return null
+
+        // 过滤掉审核中的用户组
+        val beingHandoverGroups = permissionHandoverApplicationService.listMemberHandoverDetails(
+            projectCode = projectCode,
+            memberId = removeMemberDTO.targetMember.id,
+            handoverType = HandoverType.GROUP
+        ).map { it.itemId.toInt() }
+        groupIds.removeAll(beingHandoverGroups)
+
         // 获取导致流水线代持人权限受到影响的用户组及流水线
         val (invalidGroups, invalidPipelines, invalidRepertoryIds) =
             listInvalidAuthorizationsAfterOperatedGroups(
