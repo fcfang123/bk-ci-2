@@ -18,6 +18,8 @@ data class BatchOperateGroupMemberCheckVo(
     val invalidPipelineAuthorizationCount: Int? = 0,
     @get:Schema(title = "无效的代码库授权数量")
     val invalidRepositoryAuthorizationCount: Int? = 0,
+    @get:Schema(title = "无效的环境节点授权数量")
+    val invalidEnvNodeAuthorizationCount: Int? = 0,
     @get:Schema(title = "可交接的组数量")
     val canHandoverCount: Int? = 0
 )
