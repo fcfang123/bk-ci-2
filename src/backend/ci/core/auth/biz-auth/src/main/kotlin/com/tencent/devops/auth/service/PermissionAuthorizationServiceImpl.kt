@@ -32,6 +32,7 @@ import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.environment.api.ServiceEnvNodeAuthorizationResource
 import com.tencent.devops.process.api.service.ServicePipelineAuthorizationResource
+import com.tencent.devops.project.api.service.ServiceProjectResource
 import com.tencent.devops.repository.api.ServiceRepositoryAuthorizationResource
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
@@ -315,6 +316,7 @@ class PermissionAuthorizationServiceImpl(
         val flowNo = permissionHandoverApplicationService.createHandoverApplication(
             overview = HandoverOverviewCreateDTO(
                 projectCode = projectCode,
+                projectName = client.get(ServiceProjectResource::class).get(projectCode).data!!.projectName,
                 applicant = condition.handoverFrom!!,
                 approver = condition.handoverTo!!,
                 handoverStatus = HandoverStatus.PENDING,
