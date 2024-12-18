@@ -73,7 +73,6 @@ class AuthAuthorizationDao {
                     .set(HANDOVER_FROM_CN_NAME, resourceAuthorizationDto.handoverFromCnName)
                     .set(RESOURCE_NAME, resourceAuthorizationDto.resourceName)
                     .set(HANDOVER_TIME, handoverDateTime)
-                    .where(CREATE_TIME.eq(UPDATE_TIME))
                     .execute()
             }
         }
