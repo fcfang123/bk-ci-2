@@ -39,7 +39,6 @@ import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
 
-
 class RbacPermissionHandoverApplicationService(
     private val dslContext: DSLContext,
     private val handoverOverviewDao: AuthHandoverOverviewDao,
@@ -128,7 +127,7 @@ class RbacPermissionHandoverApplicationService(
                 titleOfApplication = titleOfApplication.plus(groupCount).plus(
                     bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
                 )
-                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups，<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+                handoverOverviewContentOfEmail = """<span class="num">$groupCount</span>$bkHandoverGroups，<span class="num">$authorizationCount</span>$bkHandoverAuthorizations""".trimMargin()
                 handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(groupCount).plus(
                     bkHandoverGroups.plus("，").plus(authorizationCount).plus(bkHandoverAuthorizations)
                 )
@@ -136,13 +135,13 @@ class RbacPermissionHandoverApplicationService(
 
             groupCount > 0 -> {
                 titleOfApplication = titleOfApplication.plus(groupCount).plus(bkHandoverGroups)
-                handoverOverviewContentOfEmail = """<span class="num">${groupCount}</span>$bkHandoverGroups""".trimMargin()
+                handoverOverviewContentOfEmail = """<span class="num">$groupCount</span>$bkHandoverGroups""".trimMargin()
                 handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(groupCount).plus(bkHandoverGroups)
             }
 
             else -> {
                 titleOfApplication = titleOfApplication.plus(authorizationCount).plus(bkHandoverAuthorizations)
-                handoverOverviewContentOfEmail = """<span class="num">${authorizationCount}</span>$bkHandoverAuthorizations""".trimMargin()
+                handoverOverviewContentOfEmail = """<span class="num">$authorizationCount</span>$bkHandoverAuthorizations""".trimMargin()
                 handoverOverviewContentOfRtx = handoverOverviewContentOfRtx.plus(authorizationCount).plus(bkHandoverAuthorizations)
             }
         }

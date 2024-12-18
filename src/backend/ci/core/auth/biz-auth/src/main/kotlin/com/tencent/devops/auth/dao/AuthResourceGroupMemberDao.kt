@@ -31,7 +31,6 @@ import com.tencent.devops.auth.pojo.AuthResourceGroupMember
 import com.tencent.devops.auth.pojo.ResourceMemberInfo
 import com.tencent.devops.auth.pojo.dto.ProjectMembersQueryConditionDTO
 import com.tencent.devops.auth.pojo.enum.MemberType
-import com.tencent.devops.auth.pojo.enum.OperateChannel
 import com.tencent.devops.common.auth.api.pojo.BkAuthGroup
 import com.tencent.devops.common.db.utils.skipCheck
 import com.tencent.devops.model.auth.tables.TAuthResourceAuthorization
@@ -640,7 +639,7 @@ class AuthResourceGroupMemberDao {
     fun buildExcludeMemberGroupCondition(
         excludeIamGroupIds: List<Int>?,
         // 仅排除用户直接加入的组
-        onlyExcludeUserDirectlyJoined: Boolean?,
+        onlyExcludeUserDirectlyJoined: Boolean?
     ): MutableList<Condition> {
         val conditions = mutableListOf<Condition>()
         with(TAuthResourceGroupMember.T_AUTH_RESOURCE_GROUP_MEMBER) {

@@ -665,21 +665,40 @@ class RbacPermissionManageFacadeServiceImpl(
     ): InvalidAuthorizationsDTO {
         val startEpoch = System.currentTimeMillis()
         try {
-            val (invalidGroups, invalidPipelines) = listInvalidPipelinesAfterOperatedGroups(
+            // 筛选出本次操作中未过期的用户组
+            val iamGroupIdsOfNotExpired = getNotExpiredIamGroupIds(
                 projectCode = projectCode,
-                iamGroupIds = iamGroupIds,
-                memberId = memberId
+                memberId = memberId,
+                iamGroupIds = iamGroupIds
             )
-            val (invalidRepositoryIds, invalidEnvNodeIds) = listInvalidReposAndNodesAfterOperatedGroups(
+            // 获取用户退出/交接以上用户组后，还未退出的用户组
+            val (count, userGroupsJoinedAfterOperatedGroups) = listResourceGroupMembers(
+                projectCode = projectCode,
+                memberId = memberId,
+                excludeIamGroupIds = iamGroupIds,
+                onlyExcludeUserDirectlyJoined = true,
+                operateChannel = OperateChannel.PERSONAL,
+                minExpiredAt = LocalDateTime.now().timestampmilli()
+            )
+            logger.debug("list all user groups joined after operated groups: {}, {}", count, userGroupsJoinedAfterOperatedGroups)
+
+            val isHasProjectVisitPermAfterOperatedGroups = checkProjectVisitPermission(
+                projectCode = projectCode,
+                iamGroupIds = userGroupsJoinedAfterOperatedGroups.map { it.iamGroupId }
+            )
+            logger.debug("whether the user has project visit perm after operated groups: {}", isHasProjectVisitPermAfterOperatedGroups)
+
+            if (count == 0L || !isHasProjectVisitPermAfterOperatedGroups) {
+                return getInvalidAuthorizationsAfterAllGroupsRemoved(projectCode, memberId, iamGroupIdsOfNotExpired)
+            }
+            val (invalidGroups, invalidPipelines) = listInvalidPipelinesAfterOperatedGroups(
                 projectCode = projectCode,
                 iamGroupIds = iamGroupIds,
                 memberId = memberId
             )
             val invalidAuthorizationsDTO = InvalidAuthorizationsDTO(
                 invalidGroupIds = invalidGroups,
-                invalidPipelineIds = invalidPipelines,
-                invalidRepertoryIds = invalidRepositoryIds,
-                invalidEnvNodeIds = invalidEnvNodeIds
+                invalidPipelineIds = invalidPipelines
             )
             logger.info(
                 "invalid authorizations after operated groups|$projectCode|$iamGroupIds|$memberId|$invalidAuthorizationsDTO"
@@ -693,6 +712,61 @@ class RbacPermissionManageFacadeServiceImpl(
         }
     }
 
+    private fun getNotExpiredIamGroupIds(
+        projectCode: String,
+        memberId: String,
+        iamGroupIds: List<Int>
+    ): List<Int> {
+        return authResourceGroupMemberDao.listMemberGroupDetail(
+            dslContext = dslContext,
+            projectCode = projectCode,
+            memberId = memberId,
+            iamGroupIds = iamGroupIds,
+            minExpiredAt = LocalDateTime.now()
+        ).map { it.iamGroupId }
+    }
+
+    private fun checkProjectVisitPermission(
+        projectCode: String,
+        iamGroupIds: List<Int>
+    ): Boolean {
+        return groupPermissionService.isGroupsHasPermission(
+            projectCode = projectCode,
+            filterIamGroupIds = iamGroupIds,
+            relatedResourceType = ResourceTypeId.PROJECT,
+            relatedResourceCode = projectCode,
+            action = ActionId.PROJECT_VISIT
+        )
+    }
+
+    private fun getInvalidAuthorizationsAfterAllGroupsRemoved(
+        projectCode: String,
+        memberId: String,
+        iamGroupIdsOfNotExpired: List<Int>
+    ): InvalidAuthorizationsDTO {
+        val invalidAuthorizations = authAuthorizationDao.list(
+            dslContext = dslContext,
+            condition = ResourceAuthorizationConditionRequest(
+                projectCode = projectCode,
+                handoverFrom = memberId
+            )
+        ).groupBy({ it.resourceType }, { it.resourceCode })
+
+        val operatedGroupsWithExecutePerm = groupPermissionService.listGroupsByPermissionConditions(
+            projectCode = projectCode,
+            relatedResourceType = AuthResourceType.PIPELINE_DEFAULT.value,
+            action = ActionId.PIPELINE_EXECUTE,
+            filterIamGroupIds = iamGroupIdsOfNotExpired
+        )
+
+        return InvalidAuthorizationsDTO(
+            invalidGroupIds = operatedGroupsWithExecutePerm,
+            invalidPipelineIds = invalidAuthorizations[ResourceTypeId.PIPELINE] ?: emptyList(),
+            invalidRepertoryIds = invalidAuthorizations[ResourceTypeId.REPERTORY] ?: emptyList(),
+            invalidEnvNodeIds = invalidAuthorizations[ResourceTypeId.ENV_NODE] ?: emptyList()
+        )
+    }
+
     private fun listInvalidPipelinesAfterOperatedGroups(
         projectCode: String,
         iamGroupIds: List<Int>,
@@ -701,13 +775,11 @@ class RbacPermissionManageFacadeServiceImpl(
         logger.info("list invalid authorizations after operated groups:$projectCode|$iamGroupIds|$memberId")
         val now = LocalDateTime.now()
         // 0.筛选出本次操作中的用户未过期用户组ID
-        val iamGroupIdsOfNotExpired = authResourceGroupMemberDao.listMemberGroupDetail(
-            dslContext = dslContext,
+        val iamGroupIdsOfNotExpired = getNotExpiredIamGroupIds(
             projectCode = projectCode,
             memberId = memberId,
-            iamGroupIds = iamGroupIds,
-            minExpiredAt = now
-        ).map { it.iamGroupId }
+            iamGroupIds = iamGroupIds
+        )
         logger.debug("list iam group ids of not expired:{}", iamGroupIdsOfNotExpired)
         // 1.筛选出本次退出/交接中包含流水线执行权限的用户组
         val operatedGroupsWithExecutePerm = groupPermissionService.listGroupsByPermissionConditions(
@@ -717,6 +789,9 @@ class RbacPermissionManageFacadeServiceImpl(
             filterIamGroupIds = iamGroupIdsOfNotExpired
         )
         logger.debug("list operated groups with execute perm:{}", operatedGroupsWithExecutePerm)
+        if (operatedGroupsWithExecutePerm.isEmpty()) {
+            return InvalidAuthorizationsDTO(emptyList(), emptyList())
+        }
 
         // 2.获取用户退出/交接以上操作的用户组后，还未退出并且未过期的流水线/项目级别（仅这些类型会包含流水线执行权限）的用户组。
         val userGroupsJoinedAfterOperatedGroups = listResourceGroupMembers(
@@ -826,80 +901,6 @@ class RbacPermissionManageFacadeServiceImpl(
         }
 
         return InvalidAuthorizationsDTO(emptyList(), emptyList())
-    }
-
-    private fun listInvalidReposAndNodesAfterOperatedGroups(
-        projectCode: String,
-        iamGroupIds: List<Int>,
-        memberId: String
-    ): Pair<List<String>/*invalidRepositoryIds*/, List<String>/*invalidEnvNodeIds*/> {
-        // 获取用户退出/交接以上用户组后还加入并且未过期的用户组
-        val (count, records) = listResourceGroupMembers(
-            projectCode = projectCode,
-            memberId = memberId,
-            excludeIamGroupIds = iamGroupIds,
-            onlyExcludeUserDirectlyJoined = true,
-            operateChannel = OperateChannel.PERSONAL,
-            minExpiredAt = LocalDateTime.now().timestampmilli()
-        )
-        logger.debug("list all user groups joined after operated groups:{}|{}", count, records)
-        // 如果退出/交接了项目下所有组，直接返回用户无效代码库oauth列表
-        if (count == 0L) {
-            logger.debug("The user has removed/handover all user groups")
-            val invalidRepositoryIds = authAuthorizationDao.list(
-                dslContext = dslContext,
-                condition = ResourceAuthorizationConditionRequest(
-                    projectCode = projectCode,
-                    resourceType = ResourceTypeId.REPERTORY,
-                    handoverFrom = memberId
-                )
-            ).map { it.resourceCode }
-            val invalidEnvNodeIds = authAuthorizationDao.list(
-                dslContext = dslContext,
-                condition = ResourceAuthorizationConditionRequest(
-                    projectCode = projectCode,
-                    resourceType = ResourceTypeId.ENV_NODE,
-                    handoverFrom = memberId
-                )
-            ).map { it.resourceCode }
-            return Pair(invalidRepositoryIds, invalidEnvNodeIds)
-        }
-
-        // 检查用户是否还有权限访问权限当退出/交接以上组后
-        val isHasProjectVisitPermOperatedGroups = groupPermissionService.isGroupsHasPermission(
-            projectCode = projectCode,
-            filterIamGroupIds = records.map { it.iamGroupId },
-            relatedResourceType = ResourceTypeId.PROJECT,
-            relatedResourceCode = projectCode,
-            action = ActionId.PROJECT_VISIT
-        )
-        logger.debug("whether the user has project visit perm after operated groups {}", isHasProjectVisitPermOperatedGroups)
-        // 如果有访问权限，返回空列表，否则直接返回用户无效代码库oauth列表/环境节点授权
-        return if (isHasProjectVisitPermOperatedGroups) {
-            Pair(emptyList(), emptyList())
-        } else {
-            logger.debug(
-                "user does not have perm to visit the project after operated groups|{}|{}|{}",
-                projectCode, memberId, iamGroupIds
-            )
-            val invalidRepositoryIds = authAuthorizationDao.list(
-                dslContext = dslContext,
-                condition = ResourceAuthorizationConditionRequest(
-                    projectCode = projectCode,
-                    resourceType = ResourceTypeId.REPERTORY,
-                    handoverFrom = memberId
-                )
-            ).map { it.resourceCode }
-            val invalidEnvNodeIds = authAuthorizationDao.list(
-                dslContext = dslContext,
-                condition = ResourceAuthorizationConditionRequest(
-                    projectCode = projectCode,
-                    resourceType = ResourceTypeId.ENV_NODE,
-                    handoverFrom = memberId
-                )
-            ).map { it.resourceCode }
-            return Pair(invalidRepositoryIds, invalidEnvNodeIds)
-        }
     }
 
     override fun renewalGroupMember(
@@ -1355,7 +1356,7 @@ class RbacPermissionManageFacadeServiceImpl(
                 projectCode = projectCode,
                 repertoryIds = invalidRepertoryIds,
                 handoverFrom = removeMemberDTO.targetMember.id,
-                handoverTo = removeMemberDTO.handoverTo!!.id,
+                handoverTo = removeMemberDTO.handoverTo!!.id
             )
         }
 

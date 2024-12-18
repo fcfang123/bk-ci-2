@@ -15,7 +15,8 @@ import com.tencent.devops.common.api.model.SQLPage
 
 class SamplePermissionHandoverApplicationService : PermissionHandoverApplicationService {
     override fun createHandoverApplication(
-        overview: HandoverOverviewCreateDTO, details: List<HandoverDetailDTO>
+        overview: HandoverOverviewCreateDTO,
+        details: List<HandoverDetailDTO>
     ): String {
         return ""
     }

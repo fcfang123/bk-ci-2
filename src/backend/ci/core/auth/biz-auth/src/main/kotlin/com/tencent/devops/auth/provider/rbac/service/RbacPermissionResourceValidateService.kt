@@ -178,7 +178,7 @@ class RbacPermissionResourceValidateService(
                 dslContext = dslContext,
                 condition = ResourceAuthorizationConditionRequest(
                     projectCode = projectCode,
-                    handoverFrom = userId,
+                    handoverFrom = userId
                 )
             ) > 0
             if (!isUserHasProjectAuthorizations) {

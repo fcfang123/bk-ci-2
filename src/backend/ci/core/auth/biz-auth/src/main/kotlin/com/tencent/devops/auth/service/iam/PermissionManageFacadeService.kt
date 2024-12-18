@@ -115,6 +115,7 @@ interface PermissionManageFacadeService {
      * 1、引起代持人权限失效的用户组。
      * 2、引起代持人权限失效的流水线。
      * 3、引起代码库oauth失效的代码库（当用户操作完组后，不再拥有项目访问权限时，会代码库oauth引起失效）
+     * 4、引起失效的环境节点授权
      **/
     fun listInvalidAuthorizationsAfterOperatedGroups(
         projectCode: String,

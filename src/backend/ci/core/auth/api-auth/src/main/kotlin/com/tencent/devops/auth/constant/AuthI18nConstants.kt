@@ -50,6 +50,6 @@ object AuthI18nConstants {
 
     const val BK_APPLY_TO_HANDOVER = "bkApplyToHandover" // 申请移交
     const val BK_HANDOVER_GROUPS = "bkHandoverGroups" // 个权限用户组
-    const val BK_HANDOVER_AUTHORIZATIONS = "bkHandoverAuthorizations" //个授权
+    const val BK_HANDOVER_AUTHORIZATIONS = "bkHandoverAuthorizations" // 个授权
     const val BK_PROJECT = "bk_project" // 蓝盾项目
 }
