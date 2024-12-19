@@ -29,8 +29,10 @@
 package com.tencent.devops.auth.api.user
 
 import com.tencent.devops.auth.pojo.AuthResourceInfo
+import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.IamGroupInfoVo
 import com.tencent.devops.auth.pojo.vo.IamGroupMemberInfoVo
+import com.tencent.devops.common.api.auth.AUTH_HEADER_DEVOPS_USER_ID
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID
 import com.tencent.devops.common.api.pojo.Pagination
 import com.tencent.devops.common.api.pojo.Result
@@ -213,4 +215,13 @@ interface UserAuthResourceResource {
         @PathParam("resourceCode")
         resourceCode: String
     ): Result<AuthResourceInfo>
+
+    @GET
+    @Path("/listUserProjectsWithAuthorization")
+    @Operation(summary = "获取用户授权相关的项目")
+    fun listUserProjectsWithAuthorization(
+        @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
+        @Parameter(description = "用户ID", required = true)
+        userId: String
+    ): Result<List<AuthProjectVO>>
 }

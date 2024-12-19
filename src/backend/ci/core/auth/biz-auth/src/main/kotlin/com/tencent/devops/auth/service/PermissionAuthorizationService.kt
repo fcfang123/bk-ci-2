@@ -28,6 +28,7 @@
 package com.tencent.devops.auth.service
 
 import com.tencent.devops.auth.pojo.enum.OperateChannel
+import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.ResourceTypeInfoVo
 import com.tencent.devops.common.api.model.SQLPage
 import com.tencent.devops.common.auth.api.pojo.ResetAllResourceAuthorizationReq
@@ -85,9 +86,9 @@ interface PermissionAuthorizationService {
     /**
      * 获取用户授权相关项目
      */
-    fun listUserProjects(
+    fun listUserProjectsWithAuthorization(
         userId: String
-    ): List<String>
+    ): List<AuthProjectVO>
 
     /**
      * 修改资源授权管理

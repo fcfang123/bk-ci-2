@@ -28,6 +28,7 @@
 package com.tencent.devops.auth.resources.service
 
 import com.tencent.devops.auth.api.service.ServiceProjectAuthResource
+import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.ProjectPermissionInfoVO
 import com.tencent.devops.auth.service.PermissionAuthorizationService
 import com.tencent.devops.auth.service.iam.PermissionProjectService
@@ -216,9 +217,9 @@ class ServiceProjectAuthResourceImpl @Autowired constructor(
         )
     }
 
-    override fun listUserProjects(userId: String): Result<List<String>> {
+    override fun listUserProjectsWithAuthorization(userId: String): Result<List<AuthProjectVO>> {
         return Result(
-            permissionAuthorizationService.listUserProjects(
+            permissionAuthorizationService.listUserProjectsWithAuthorization(
                 userId = userId
             )
         )
