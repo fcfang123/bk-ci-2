@@ -29,7 +29,9 @@
 package com.tencent.devops.auth.api.user
 
 import com.tencent.devops.auth.pojo.enum.OperateChannel
+import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.ResourceTypeInfoVo
+import com.tencent.devops.common.api.auth.AUTH_HEADER_DEVOPS_USER_ID
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID_DEFAULT_VALUE
 import com.tencent.devops.common.api.model.SQLPage
@@ -142,4 +144,13 @@ interface UserAuthAuthorizationResource {
         @Parameter(description = "资源授权交接条件实体", required = true)
         condition: ResetAllResourceAuthorizationReq
     ): Result<List<ResourceTypeInfoVo>>
+
+    @GET
+    @Path("/listUserProjectsWithAuthorization")
+    @Operation(summary = "获取用户授权相关的项目")
+    fun listUserProjectsWithAuthorization(
+        @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
+        @Parameter(description = "用户ID", required = true)
+        userId: String
+    ): Result<List<AuthProjectVO>>
 }

@@ -215,13 +215,4 @@ interface UserAuthResourceResource {
         @PathParam("resourceCode")
         resourceCode: String
     ): Result<AuthResourceInfo>
-
-    @GET
-    @Path("/listUserProjectsWithAuthorization")
-    @Operation(summary = "获取用户授权相关的项目")
-    fun listUserProjectsWithAuthorization(
-        @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
-        @Parameter(description = "用户ID", required = true)
-        userId: String
-    ): Result<List<AuthProjectVO>>
 }

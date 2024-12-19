@@ -2,6 +2,7 @@ package com.tencent.devops.auth.resources.user
 
 import com.tencent.devops.auth.api.user.UserAuthAuthorizationResource
 import com.tencent.devops.auth.pojo.enum.OperateChannel
+import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.ResourceTypeInfoVo
 import com.tencent.devops.auth.service.PermissionAuthorizationService
 import com.tencent.devops.auth.service.iam.PermissionResourceValidateService
@@ -102,5 +103,9 @@ class UserAuthAuthorizationResourceImpl(
                 condition = condition
             )
         )
+    }
+
+    override fun listUserProjectsWithAuthorization(userId: String): Result<List<AuthProjectVO>> {
+        return Result(permissionAuthorizationService.listUserProjectsWithAuthorization(userId))
     }
 }

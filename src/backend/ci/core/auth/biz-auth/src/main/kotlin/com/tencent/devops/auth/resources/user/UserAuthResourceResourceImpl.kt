@@ -47,8 +47,7 @@ import org.springframework.beans.factory.annotation.Autowired
 class UserAuthResourceResourceImpl @Autowired constructor(
     private val permissionResourceService: PermissionResourceService,
     private val permissionResourceValidateService: PermissionResourceValidateService,
-    private val permissionResourceGroupService: PermissionResourceGroupService,
-    private val permissionAuthorizationService: PermissionAuthorizationService
+    private val permissionResourceGroupService: PermissionResourceGroupService
 ) : UserAuthResourceResource {
     override fun hasManagerPermission(
         userId: String,
@@ -188,9 +187,5 @@ class UserAuthResourceResourceImpl @Autowired constructor(
                 resourceCode = resourceCode
             )
         )
-    }
-
-    override fun listUserProjectsWithAuthorization(userId: String): Result<List<AuthProjectVO>> {
-        return Result(permissionAuthorizationService.listUserProjectsWithAuthorization(userId))
     }
 }
