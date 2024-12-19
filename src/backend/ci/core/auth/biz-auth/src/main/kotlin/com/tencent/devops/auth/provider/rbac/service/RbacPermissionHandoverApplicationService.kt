@@ -97,9 +97,9 @@ class RbacPermissionHandoverApplicationService(
             "table" to handoverOverviewTable,
             "url" to String.format(handoverApplicationUrl, flowNo)
         )
-        // 发邮件
+        logger.info("send handover application email:{} ", bodyParams)
         val request = SendNotifyMessageTemplateRequest(
-            templateCode = TEMPLATE_CODE,
+            templateCode = HANDOVER_APPLICATION_TEMPLATE_CODE,
             bodyParams = bodyParams,
             titleParams = bodyParams,
             notifyType = mutableSetOf(NotifyType.RTX.name, NotifyType.EMAIL.name),
@@ -360,6 +360,6 @@ class RbacPermissionHandoverApplicationService(
         private const val FLOW_NO_PREFIX = "REQ"
         private const val FLOW_NO_KEY = "AUTH:HANDOVER:FLOW:NO:%s"
         private const val HANDOVER_APPLICATION_TABLE_OF_EMAIL = "<tr><td style=\"font-size: 14px;\"  align=\"center\">%s</td><td style=\"font-size: 14px;\"  align=\"center\">%s</td><td style=\"font-size: 14px;\"  align=\"center\">%s</td></tr>"
-        private const val TEMPLATE_CODE = "BK_PERMISSIONS_HANDOVER_APPLICATION"
+        private const val HANDOVER_APPLICATION_TEMPLATE_CODE = "BK_PERMISSIONS_HANDOVER_APPLICATION"
     }
 }

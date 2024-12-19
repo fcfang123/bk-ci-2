@@ -72,10 +72,15 @@ import com.tencent.devops.common.auth.api.pojo.ResetAllResourceAuthorizationReq
 import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationConditionRequest
 import com.tencent.devops.common.auth.api.pojo.ResourceAuthorizationHandoverConditionRequest
 import com.tencent.devops.common.auth.enums.HandoverChannelCode
+import com.tencent.devops.common.client.Client
+import com.tencent.devops.common.notify.enums.NotifyType
 import com.tencent.devops.common.redis.RedisOperation
+import com.tencent.devops.common.service.config.CommonConfig
 import com.tencent.devops.common.service.utils.RetryUtils
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.model.auth.tables.records.TAuthResourceGroupRecord
+import com.tencent.devops.notify.api.service.ServiceNotifyMessageTemplateResource
+import com.tencent.devops.notify.pojo.SendNotifyMessageTemplateRequest
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
@@ -99,7 +104,9 @@ class RbacPermissionManageFacadeServiceImpl(
     private val rbacCacheService: RbacCacheService,
     private val redisOperation: RedisOperation,
     private val authorizationDao: AuthAuthorizationDao,
-    private val authResourceService: AuthResourceService
+    private val authResourceService: AuthResourceService,
+    private val client: Client,
+    private val config: CommonConfig
 ) : PermissionManageFacadeService {
     override fun getMemberGroupsDetails(
         projectId: String,
@@ -1825,6 +1832,30 @@ class RbacPermissionManageFacadeServiceImpl(
                 permissionHandoverApplicationService.updateHandoverApplication(
                     overview = request
                 )
+                val projectName = authResourceService.get(
+                    projectCode = request.projectCode,
+                    resourceType = ResourceTypeId.PROJECT,
+                    resourceCode = request.projectCode
+                ).resourceName
+                val bodyParams = mapOf(
+                    "projectName" to projectName,
+                    "result" to request.handoverAction.alias,
+                    "url" to String.format(handoverApplicationUrl, request.flowNo)
+                )
+                // 发邮件
+                val emailRequest = SendNotifyMessageTemplateRequest(
+                    templateCode = HANDOVER_APPLICATION_RESULT_TEMPLATE_CODE,
+                    bodyParams = bodyParams,
+                    titleParams = bodyParams,
+                    notifyType = mutableSetOf(NotifyType.RTX.name, NotifyType.EMAIL.name),
+                    receivers = mutableSetOf(overview.applicant)
+                )
+                logger.info("send handover application result email:{}|{} ", request, emailRequest)
+                kotlin.runCatching {
+                    client.get(ServiceNotifyMessageTemplateResource::class).sendNotifyMessageByTemplate(emailRequest)
+                }.onFailure {
+                    logger.warn("notify email fail ${it.message}|$bodyParams|${overview.approver}")
+                }
             } catch (e: Exception) {
                 logger.warn("handle hanover application error,$e|$request")
                 throw e
@@ -2286,6 +2317,8 @@ class RbacPermissionManageFacadeServiceImpl(
         }
     }
 
+    private val handoverApplicationUrl = "${config.devopsHostGateway}/console/permission/my-handover?type=handoverFromMe&flowNo=%s"
+
     companion object {
         private val logger = LoggerFactory.getLogger(RbacPermissionResourceMemberService::class.java)
 
@@ -2293,5 +2326,7 @@ class RbacPermissionManageFacadeServiceImpl(
 
         // 永久过期时间
         private const val PERMANENT_EXPIRED_TIME = 4102444800000L
+
+        private const val HANDOVER_APPLICATION_RESULT_TEMPLATE_CODE = "BK_PERMISSIONS_HANDOVER_APPLICATION_RESULT"
     }
 }
