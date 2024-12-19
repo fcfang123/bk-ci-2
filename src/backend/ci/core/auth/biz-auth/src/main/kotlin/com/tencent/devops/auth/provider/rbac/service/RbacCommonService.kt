@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
 @Suppress("MagicNumber", "LongParameterList")
-class RbacCacheService constructor(
+class RbacCommonService(
     private val dslContext: DSLContext,
     private val authResourceTypeDao: AuthResourceTypeDao,
     private val authActionDao: AuthActionDao,
@@ -42,7 +42,7 @@ class RbacCacheService constructor(
 ) {
 
     companion object {
-        private val logger = LoggerFactory.getLogger(RbacCacheService::class.java)
+        private val logger = LoggerFactory.getLogger(RbacCommonService::class.java)
     }
 
     /*获取资源类型下的动作*/

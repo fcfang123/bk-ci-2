@@ -54,7 +54,7 @@ class RbacPermissionProjectService(
     private val authResourceService: AuthResourceService,
     private val authResourceGroupDao: AuthResourceGroupDao,
     private val dslContext: DSLContext,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val resourceGroupMemberService: RbacPermissionResourceMemberService,
     private val client: Client,
     private val resourceMemberService: PermissionResourceMemberService,
@@ -139,7 +139,7 @@ class RbacPermissionProjectService(
                 return managerPermission
             }
 
-            return rbacCacheService.validateUserProjectPermission(
+            return rbacCommonService.validateUserProjectPermission(
                 userId = userId,
                 projectCode = projectCode,
                 permission = AuthPermission.VISIT
@@ -176,7 +176,7 @@ class RbacPermissionProjectService(
     }
 
     override fun checkProjectManager(userId: String, projectCode: String): Boolean {
-        return rbacCacheService.checkProjectManager(userId, projectCode)
+        return rbacCommonService.checkProjectManager(userId, projectCode)
     }
 
     override fun createProjectUser(userId: String, projectCode: String, roleCode: String): Boolean {

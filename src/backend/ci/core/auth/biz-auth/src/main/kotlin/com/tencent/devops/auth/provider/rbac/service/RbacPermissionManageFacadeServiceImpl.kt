@@ -102,7 +102,7 @@ class RbacPermissionManageFacadeServiceImpl(
     private val syncIamGroupMemberService: PermissionResourceGroupSyncService,
     private val permissionAuthorizationService: PermissionAuthorizationService,
     private val permissionHandoverApplicationService: PermissionHandoverApplicationService,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val redisOperation: RedisOperation,
     private val authorizationDao: AuthAuthorizationDao,
     private val authResourceService: AuthResourceService,
@@ -376,7 +376,7 @@ class RbacPermissionManageFacadeServiceImpl(
             maxExpiredAt = maxExpiredAt?.let { DateTimeUtil.convertTimestampToLocalDateTime(it / 1000) },
             memberDeptInfos = memberDeptInfos
         )
-        return rbacCacheService.convertResourceType2Count(memberGroupCountMap)
+        return rbacCommonService.convertResourceType2Count(memberGroupCountMap)
     }
 
     private fun getMemberTemplateIdsAndDeptInfos(
@@ -1947,7 +1947,7 @@ class RbacPermissionManageFacadeServiceImpl(
             )
             if (resourceType2CountOfGroup.isNotEmpty()) {
                 result.addAll(
-                    rbacCacheService.convertResourceType2Count(
+                    rbacCommonService.convertResourceType2Count(
                         resourceType2Count = resourceType2CountOfGroup,
                         type = HandoverType.GROUP
                     )
@@ -1956,7 +1956,7 @@ class RbacPermissionManageFacadeServiceImpl(
         }
         if (invalidPipelines.isNotEmpty()) {
             result.addAll(
-                rbacCacheService.convertResourceType2Count(
+                rbacCommonService.convertResourceType2Count(
                     resourceType2Count = mapOf(ResourceTypeId.PIPELINE to invalidPipelines.size.toLong()),
                     type = HandoverType.AUTHORIZATION
                 )
@@ -1964,7 +1964,7 @@ class RbacPermissionManageFacadeServiceImpl(
         }
         if (invalidRepertoryIds.isNotEmpty()) {
             result.addAll(
-                rbacCacheService.convertResourceType2Count(
+                rbacCommonService.convertResourceType2Count(
                     resourceType2Count = mapOf(ResourceTypeId.REPERTORY to invalidRepertoryIds.size.toLong()),
                     type = HandoverType.AUTHORIZATION
                 )
@@ -1972,7 +1972,7 @@ class RbacPermissionManageFacadeServiceImpl(
         }
         if (invalidEnvNodeIds.isNotEmpty()) {
             result.addAll(
-                rbacCacheService.convertResourceType2Count(
+                rbacCommonService.convertResourceType2Count(
                     resourceType2Count = mapOf(ResourceTypeId.ENV_NODE to invalidEnvNodeIds.size.toLong()),
                     type = HandoverType.AUTHORIZATION
                 )
@@ -2059,7 +2059,7 @@ class RbacPermissionManageFacadeServiceImpl(
             userId = userId,
             iamTemplateIds = iamTemplateIds,
             memberDeptInfos = memberDeptInfos
-        ) || rbacCacheService.validateUserProjectPermission(
+        ) || rbacCommonService.validateUserProjectPermission(
             userId = userId,
             projectCode = projectCode,
             permission = AuthPermission.VISIT

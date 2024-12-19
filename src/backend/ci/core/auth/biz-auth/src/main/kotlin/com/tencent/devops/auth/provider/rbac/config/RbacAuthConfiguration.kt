@@ -60,7 +60,7 @@ import com.tencent.devops.auth.provider.rbac.service.AuthResourceService
 import com.tencent.devops.auth.provider.rbac.service.ItsmService
 import com.tencent.devops.auth.provider.rbac.service.PermissionGradeManagerService
 import com.tencent.devops.auth.provider.rbac.service.PermissionSubsetManagerService
-import com.tencent.devops.auth.provider.rbac.service.RbacCacheService
+import com.tencent.devops.auth.provider.rbac.service.RbacCommonService
 import com.tencent.devops.auth.provider.rbac.service.RbacPermissionApplyService
 import com.tencent.devops.auth.provider.rbac.service.RbacPermissionAuthMonitorSpaceService
 import com.tencent.devops.auth.provider.rbac.service.RbacPermissionAuthorizationScopesService
@@ -216,7 +216,7 @@ class RbacAuthConfiguration {
         syncIamGroupMemberService: PermissionResourceGroupSyncService,
         authAuthorizationDao: AuthAuthorizationDao,
         permissionHandoverApplicationService: PermissionHandoverApplicationService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         redisOperation: RedisOperation,
         authorizationDao: AuthAuthorizationDao,
         authResourceService: AuthResourceService,
@@ -235,7 +235,7 @@ class RbacAuthConfiguration {
         syncIamGroupMemberService = syncIamGroupMemberService,
         authAuthorizationDao = authAuthorizationDao,
         permissionHandoverApplicationService = permissionHandoverApplicationService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         redisOperation = redisOperation,
         authorizationDao = authorizationDao,
         authResourceService = authResourceService,
@@ -246,7 +246,7 @@ class RbacAuthConfiguration {
     @Bean
     fun permissionResourceGroupPermissionService(
         v2ManagerService: V2ManagerService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         monitorSpaceService: AuthMonitorSpaceService,
         authResourceGroupDao: AuthResourceGroupDao,
         dslContext: DSLContext,
@@ -260,7 +260,7 @@ class RbacAuthConfiguration {
         objectMapper: ObjectMapper
     ) = RbacPermissionResourceGroupPermissionService(
         v2ManagerService = v2ManagerService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         monitorSpaceService = monitorSpaceService,
         authResourceGroupDao = authResourceGroupDao,
         dslContext = dslContext,
@@ -282,7 +282,7 @@ class RbacAuthConfiguration {
         authResourceGroupMemberDao: AuthResourceGroupMemberDao,
         dslContext: DSLContext,
         deptService: DeptService,
-        rbacCacheService: RbacCacheService
+        rbacCommonService: RbacCommonService
     ) = RbacPermissionResourceMemberService(
         authResourceService = authResourceService,
         iamV2ManagerService = iamV2ManagerService,
@@ -319,7 +319,7 @@ class RbacAuthConfiguration {
         iamV2PolicyService: PolicyService,
         authResourceCodeConverter: AuthResourceCodeConverter,
         superManagerService: SuperManagerService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         client: Client,
         authProjectUserMetricsService: AuthProjectUserMetricsService
     ) = RbacPermissionService(
@@ -329,7 +329,7 @@ class RbacAuthConfiguration {
         policyService = iamV2PolicyService,
         authResourceCodeConverter = authResourceCodeConverter,
         superManagerService = superManagerService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         client = client,
         authProjectUserMetricsService = authProjectUserMetricsService
     )
@@ -341,7 +341,7 @@ class RbacAuthConfiguration {
         authResourceService: AuthResourceService,
         authResourceGroupDao: AuthResourceGroupDao,
         dslContext: DSLContext,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         resourceGroupMemberService: RbacPermissionResourceMemberService,
         client: Client,
         resourceMemberService: PermissionResourceMemberService,
@@ -351,7 +351,7 @@ class RbacAuthConfiguration {
         authResourceService = authResourceService,
         authResourceGroupDao = authResourceGroupDao,
         dslContext = dslContext,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         resourceGroupMemberService = resourceGroupMemberService,
         client = client,
         resourceMemberService = resourceMemberService,
@@ -376,7 +376,7 @@ class RbacAuthConfiguration {
         authResourceService: AuthResourceService,
         authResourceGroupConfigDao: AuthResourceGroupConfigDao,
         authResourceGroupDao: AuthResourceGroupDao,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         config: CommonConfig,
         client: Client,
         authResourceCodeConverter: AuthResourceCodeConverter,
@@ -390,7 +390,7 @@ class RbacAuthConfiguration {
         authResourceService = authResourceService,
         authResourceGroupConfigDao = authResourceGroupConfigDao,
         authResourceGroupDao = authResourceGroupDao,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         config = config,
         client = client,
         authResourceCodeConverter = authResourceCodeConverter,
@@ -404,13 +404,13 @@ class RbacAuthConfiguration {
     @Primary
     fun rbacPermissionResourceValidateService(
         permissionService: PermissionService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         client: Client,
         authAuthorizationDao: AuthAuthorizationDao,
         dslContext: DSLContext
     ) = RbacPermissionResourceValidateService(
         permissionService = permissionService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         client = client,
         authAuthorizationDao = authAuthorizationDao,
         dslContext = dslContext
@@ -426,7 +426,7 @@ class RbacAuthConfiguration {
     @Bean
     fun migrateResourceService(
         resourceService: ResourceService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         rbacPermissionResourceService: RbacPermissionResourceService,
         migrateCreatorFixService: MigrateCreatorFixService,
         authResourceService: AuthResourceService,
@@ -441,7 +441,7 @@ class RbacAuthConfiguration {
         authResourceGroupDao: AuthResourceGroupDao
     ) = MigrateResourceService(
         resourceService = resourceService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         rbacPermissionResourceService = rbacPermissionResourceService,
         migrateCreatorFixService = migrateCreatorFixService,
         authResourceService = authResourceService,
@@ -475,7 +475,7 @@ class RbacAuthConfiguration {
     @Bean
     fun migrateResultService(
         permissionService: PermissionService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         migrateResourceCodeConverter: MigrateResourceCodeConverter,
         authVerifyRecordService: AuthVerifyRecordService,
         migrateResourceService: MigrateResourceService,
@@ -487,7 +487,7 @@ class RbacAuthConfiguration {
         redisOperation: RedisOperation
     ) = MigrateResultService(
         permissionService = permissionService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         migrateResourceCodeConverter = migrateResourceCodeConverter,
         authVerifyRecordService = authVerifyRecordService,
         migrateResourceService = migrateResourceService,
@@ -510,7 +510,7 @@ class RbacAuthConfiguration {
         migrateIamApiService: MigrateIamApiService,
         authResourceCodeConverter: AuthResourceCodeConverter,
         permissionService: PermissionService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         authMigrationDao: AuthMigrationDao,
         deptService: DeptService,
         permissionResourceGroupPermissionService: PermissionResourceGroupPermissionService,
@@ -525,7 +525,7 @@ class RbacAuthConfiguration {
         migrateResourceCodeConverter = migrateResourceCodeConverter,
         authResourceCodeConverter = authResourceCodeConverter,
         permissionService = permissionService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         authMigrationDao = authMigrationDao,
         deptService = deptService,
         permissionResourceGroupPermissionService = permissionResourceGroupPermissionService,
@@ -543,7 +543,7 @@ class RbacAuthConfiguration {
         migrateIamApiService: MigrateIamApiService,
         authResourceCodeConverter: AuthResourceCodeConverter,
         permissionService: PermissionService,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         authMigrationDao: AuthMigrationDao,
         deptService: DeptService,
         permissionResourceGroupPermissionService: PermissionResourceGroupPermissionService,
@@ -558,7 +558,7 @@ class RbacAuthConfiguration {
         migrateResourceCodeConverter = migrateResourceCodeConverter,
         authResourceCodeConverter = authResourceCodeConverter,
         permissionService = permissionService,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         authMigrationDao = authMigrationDao,
         deptService = deptService,
         permissionResourceGroupPermissionService = permissionResourceGroupPermissionService,
@@ -581,7 +581,6 @@ class RbacAuthConfiguration {
         dslContext: DSLContext,
         authMigrationDao: AuthMigrationDao,
         authMonitorSpaceDao: AuthMonitorSpaceDao,
-        cacheService: RbacCacheService,
         permissionResourceMemberService: RbacPermissionResourceMemberService,
         migrateResourceAuthorizationService: MigrateResourceAuthorizationService,
         migrateResourceGroupService: MigrateResourceGroupService
@@ -599,7 +598,6 @@ class RbacAuthConfiguration {
         dslContext = dslContext,
         authMigrationDao = authMigrationDao,
         authMonitorSpaceDao = authMonitorSpaceDao,
-        cacheService = cacheService,
         permissionResourceMemberService = permissionResourceMemberService,
         migrateResourceAuthorizationService = migrateResourceAuthorizationService,
         migrateResourceGroupService = migrateResourceGroupService
@@ -631,7 +629,7 @@ class RbacAuthConfiguration {
         handoverDetailDao: AuthHandoverDetailDao,
         authorizationDao: AuthAuthorizationDao,
         authResourceGroupDao: AuthResourceGroupDao,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         redisOperation: RedisOperation,
         client: Client,
         config: CommonConfig,
@@ -642,7 +640,7 @@ class RbacAuthConfiguration {
         handoverDetailDao = handoverDetailDao,
         authorizationDao = authorizationDao,
         authResourceGroupDao = authResourceGroupDao,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         redisOperation = redisOperation,
         client = client,
         config = config,
@@ -685,7 +683,7 @@ class RbacAuthConfiguration {
         authResourceGroupDao: AuthResourceGroupDao,
         iamV2ManagerService: V2ManagerService,
         authResourceGroupMemberDao: AuthResourceGroupMemberDao,
-        rbacCacheService: RbacCacheService,
+        rbacCommonService: RbacCommonService,
         redisOperation: RedisOperation,
         authResourceSyncDao: AuthResourceSyncDao,
         authResourceGroupApplyDao: AuthResourceGroupApplyDao,
@@ -698,7 +696,7 @@ class RbacAuthConfiguration {
         authResourceGroupDao = authResourceGroupDao,
         iamV2ManagerService = iamV2ManagerService,
         authResourceGroupMemberDao = authResourceGroupMemberDao,
-        rbacCacheService = rbacCacheService,
+        rbacCommonService = rbacCommonService,
         redisOperation = redisOperation,
         authResourceSyncDao = authResourceSyncDao,
         authResourceGroupApplyDao = authResourceGroupApplyDao,

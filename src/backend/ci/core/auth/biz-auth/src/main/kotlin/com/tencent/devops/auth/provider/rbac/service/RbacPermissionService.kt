@@ -63,7 +63,7 @@ class RbacPermissionService(
     private val policyService: PolicyService,
     private val authResourceCodeConverter: AuthResourceCodeConverter,
     private val superManagerService: SuperManagerService,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val client: Client,
     private val authProjectUserMetricsService: AuthProjectUserMetricsService
 ) : PermissionService {
@@ -94,7 +94,7 @@ class RbacPermissionService(
         projectCode: String,
         resourceType: String?
     ): Boolean {
-        val actionInfo = rbacCacheService.getActionInfo(action)
+        val actionInfo = rbacCommonService.getActionInfo(action)
         // 如果action关联的资源是项目,则直接查询项目的权限
         return if (actionInfo.relatedResourceType == AuthResourceType.PROJECT.value) {
             validateUserResourcePermissionByRelation(
@@ -265,7 +265,7 @@ class RbacPermissionService(
         )
         val startEpoch = System.currentTimeMillis()
         try {
-            if (rbacCacheService.checkProjectManager(userId = userId, projectCode = projectCode)) {
+            if (rbacCommonService.checkProjectManager(userId = userId, projectCode = projectCode)) {
                 return actions.associateWith { true }
             }
             val actionList = actions.map { action ->
@@ -457,7 +457,7 @@ class RbacPermissionService(
         )
         val startEpoch = System.currentTimeMillis()
         try {
-            if (rbacCacheService.checkProjectManager(userId = userId, projectCode = projectCode)) {
+            if (rbacCommonService.checkProjectManager(userId = userId, projectCode = projectCode)) {
                 return actions.associate {
                     val authPermission = it.substringAfterLast("_")
                     AuthPermission.get(authPermission) to resources.map { resource -> resource.resourceCode }
@@ -614,7 +614,7 @@ class RbacPermissionService(
         resourceType: String,
         action: String
     ): Boolean {
-        return rbacCacheService.checkProjectManager(
+        return rbacCommonService.checkProjectManager(
             userId = userId,
             projectCode = projectCode
         ) || superManagerService.projectManagerCheck(

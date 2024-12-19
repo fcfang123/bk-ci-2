@@ -45,7 +45,7 @@ class RbacPermissionHandoverApplicationService(
     private val handoverDetailDao: AuthHandoverDetailDao,
     private val authorizationDao: AuthAuthorizationDao,
     private val authResourceGroupDao: AuthResourceGroupDao,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val redisOperation: RedisOperation,
     private val client: Client,
     private val config: CommonConfig,
@@ -82,7 +82,7 @@ class RbacPermissionHandoverApplicationService(
         val handoverOverviewTableBuilder = StringBuilder()
         resourceType2CountOfHandover.forEach {
             handoverOverviewTableBuilder.append(
-                java.lang.String.format(
+                String.format(
                     HANDOVER_APPLICATION_TABLE_OF_EMAIL, it.type.alias, it.resourceTypeName, it.count
                 )
             )
@@ -295,7 +295,7 @@ class RbacPermissionHandoverApplicationService(
         val result = mutableListOf<ResourceType2CountVo>()
         if (resourceType2CountWithGroup.isNotEmpty()) {
             result.addAll(
-                rbacCacheService.convertResourceType2Count(
+                rbacCommonService.convertResourceType2Count(
                     resourceType2Count = resourceType2CountWithGroup,
                     type = HandoverType.GROUP
                 )
@@ -303,7 +303,7 @@ class RbacPermissionHandoverApplicationService(
         }
         if (resourceType2CountWithAuthorization.isNotEmpty()) {
             result.addAll(
-                rbacCacheService.convertResourceType2Count(
+                rbacCommonService.convertResourceType2Count(
                     resourceType2Count = resourceType2CountWithAuthorization,
                     type = HandoverType.AUTHORIZATION
                 )

@@ -53,7 +53,7 @@ import javax.ws.rs.NotFoundException
 
 class RbacPermissionResourceValidateService(
     private val permissionService: PermissionService,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val client: Client,
     private val authAuthorizationDao: AuthAuthorizationDao,
     private val dslContext: DSLContext
@@ -75,7 +75,7 @@ class RbacPermissionResourceValidateService(
             val resourceActionList = mutableSetOf<String>()
 
             permissionBatchValidateDTO.actionList.forEach { action ->
-                val actionInfo = rbacCacheService.getActionInfo(action)
+                val actionInfo = rbacCommonService.getActionInfo(action)
                 val iamRelatedResourceType = actionInfo.relatedResourceType
                 if (iamRelatedResourceType == AuthResourceType.PROJECT.value) {
                     projectActionList.add(action)
@@ -123,7 +123,7 @@ class RbacPermissionResourceValidateService(
         resourceCode: String
     ): Boolean {
         checkProjectApprovalStatus(resourceType, resourceCode)
-        val checkProjectManage = rbacCacheService.checkProjectManager(
+        val checkProjectManage = rbacCommonService.checkProjectManager(
             userId = userId,
             projectCode = projectId
         )

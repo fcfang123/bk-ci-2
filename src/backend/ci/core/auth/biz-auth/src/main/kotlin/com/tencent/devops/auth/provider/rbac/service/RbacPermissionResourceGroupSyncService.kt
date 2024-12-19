@@ -75,7 +75,7 @@ class RbacPermissionResourceGroupSyncService @Autowired constructor(
     private val authResourceGroupDao: AuthResourceGroupDao,
     private val iamV2ManagerService: V2ManagerService,
     private val authResourceGroupMemberDao: AuthResourceGroupMemberDao,
-    private val rbacCacheService: RbacCacheService,
+    private val rbacCommonService: RbacCommonService,
     private val redisOperation: RedisOperation,
     private val authResourceSyncDao: AuthResourceSyncDao,
     private val authResourceGroupApplyDao: AuthResourceGroupApplyDao,
@@ -506,7 +506,7 @@ class RbacPermissionResourceGroupSyncService @Autowired constructor(
         val startEpoch = System.currentTimeMillis()
         logger.info("start to sync resource group member:$projectCode")
         try {
-            val resourceTypes = rbacCacheService.listResourceTypes().map { it.resourceType }
+            val resourceTypes = rbacCommonService.listResourceTypes().map { it.resourceType }
             val traceId = MDC.get(TraceTag.BIZID)
             val resourceTypeFuture = resourceTypes.map { resourceType ->
                 CompletableFuture.supplyAsync(
