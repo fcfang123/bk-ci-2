@@ -133,6 +133,7 @@ class PermissionAuthorizationServiceImpl(
         return true
     }
 
+    @Suppress("NestedBlockDepth")
     override fun listResourceAuthorizations(
         condition: ResourceAuthorizationConditionRequest,
         operateChannel: OperateChannel?
