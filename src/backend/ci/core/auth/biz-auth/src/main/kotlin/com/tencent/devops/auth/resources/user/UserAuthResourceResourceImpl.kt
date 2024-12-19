@@ -31,10 +31,8 @@ package com.tencent.devops.auth.resources.user
 import com.tencent.devops.auth.api.user.UserAuthResourceResource
 import com.tencent.devops.auth.pojo.AuthResourceInfo
 import com.tencent.devops.auth.pojo.dto.ListGroupConditionDTO
-import com.tencent.devops.auth.pojo.vo.AuthProjectVO
 import com.tencent.devops.auth.pojo.vo.IamGroupInfoVo
 import com.tencent.devops.auth.pojo.vo.IamGroupMemberInfoVo
-import com.tencent.devops.auth.service.PermissionAuthorizationService
 import com.tencent.devops.auth.service.iam.PermissionResourceGroupService
 import com.tencent.devops.auth.service.iam.PermissionResourceService
 import com.tencent.devops.auth.service.iam.PermissionResourceValidateService
