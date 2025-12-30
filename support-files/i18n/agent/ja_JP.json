@@ -5,7 +5,7 @@
    "ExecutableFileMissing": {
       "other": "\n{{.filename}} 実行ファイルが欠損しています。{{.dir}} ディレクトリで install.sh を実行するか agent.zip を再解凍しインストールディレクトリを復元してください"
    },
-   "CreateTmpDirectory极Failed": {
+   "CreateTmpDirectoryFailed": {
       "other": "一時ディレクトリ作成失敗: {{.err}}"
    },
    "StartWorkerProcessFailed": {

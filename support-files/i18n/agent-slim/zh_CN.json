@@ -24,7 +24,7 @@
       "other": "构建进程执行错误"
    },
    "EC_LoseRunFileError": {
-      "other": "丢失执行文件失败错误"
+      "other": "执行文件丢失错误"
    },
    "EC_MakeTmpDirError": {
       "other": "创建临时目录失败"
