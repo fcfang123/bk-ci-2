@@ -58,6 +58,7 @@
     import templateInfo from '../../components/common/detail-info/template'
     import codeSection from '../../components/common/detailTab/codeSection'
     import detailScore from '../../components/common/detailTab/detailScore'
+    import errorCodeDetail from '../../components/common/detailTab/errorCodeDetail'
     import outputDetail from '../../components/common/detailTab/outputDetail'
     import qualityDetail from '../../components/common/detailTab/qualityDetail'
     import versionLogDetail from '../../components/common/detailTab/versionLogDetail'
@@ -76,6 +77,7 @@
             yamlDetail,
             outputDetail,
             qualityDetail,
+            errorCodeDetail,
             versionLogDetail,
         },
 
