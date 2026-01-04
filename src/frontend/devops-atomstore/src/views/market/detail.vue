@@ -79,6 +79,7 @@
             qualityDetail,
             errorCodeDetail,
             versionLogDetail,
+            qualityDetail
         },
 
         data () {
