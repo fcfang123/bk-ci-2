@@ -434,6 +434,36 @@ class AuthResourceDao {
         }
     }
 
+    fun getByResourceName(
+        dslContext: DSLContext,
+        projectCode: String,
+        resourceType: String,
+        resourceName: String
+    ): List<TAuthResourceRecord> {
+        with(TAuthResource.T_AUTH_RESOURCE) {
+            return dslContext.selectFrom(this)
+                .where(PROJECT_CODE.eq(projectCode))
+                .and(RESOURCE_TYPE.eq(resourceType))
+                .and(RESOURCE_NAME.eq(resourceName))
+                .fetch()
+        }
+    }
+
+    fun getByResourceCode(
+        dslContext: DSLContext,
+        projectCode: String,
+        resourceType: String,
+        resourceCode: String
+    ): List<TAuthResourceRecord> {
+        with(TAuthResource.T_AUTH_RESOURCE) {
+            return dslContext.selectFrom(this)
+                .where(PROJECT_CODE.eq(projectCode))
+                .and(RESOURCE_TYPE.eq(resourceType))
+                .and(RESOURCE_CODE.eq(resourceCode))
+                .fetch()
+        }
+    }
+
     fun convert(recode: TAuthResourceRecord): AuthResourceInfo {
         with(recode) {
             return AuthResourceInfo(
