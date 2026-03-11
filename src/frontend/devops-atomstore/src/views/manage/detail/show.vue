@@ -25,14 +25,14 @@
     import imageShow from '@/components/manage/detail/image-detail/show.vue'
     import serviceShow from '@/components/manage/detail/service-detail/show.vue'
     import { mapGetters } from 'vuex'
-    import DEVXShow from '@/components/manage/detail/client-detail/show.vue'
+    import devxShow from '@/components/manage/detail/client-detail/show.vue'
 
     export default {
         components: {
             atomShow,
             imageShow,
             serviceShow,
-            DEVXShow
+            devxShow
         },
 
         computed: {
