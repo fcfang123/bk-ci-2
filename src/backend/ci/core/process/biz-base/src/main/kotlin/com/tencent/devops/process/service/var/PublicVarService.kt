@@ -40,7 +40,6 @@ import com.tencent.devops.process.dao.`var`.PublicVarDao
 import com.tencent.devops.process.dao.`var`.PublicVarGroupDao
 import com.tencent.devops.process.dao.`var`.PublicVarGroupReferInfoDao
 import com.tencent.devops.process.dao.`var`.PublicVarReferInfoDao
-import com.tencent.devops.process.dao.`var`.PublicVarVersionSummaryDao
 import com.tencent.devops.process.pojo.`var`.VarGroupDiffResult
 import com.tencent.devops.process.pojo.`var`.`do`.PublicVarDO
 import com.tencent.devops.process.pojo.`var`.dto.PublicVarDTO
@@ -51,12 +50,12 @@ import com.tencent.devops.process.pojo.`var`.po.PublicVarPositionPO
 import com.tencent.devops.process.pojo.`var`.po.ResourcePublicVarGroupReferPO
 import com.tencent.devops.process.pojo.`var`.vo.PublicVarVO
 import com.tencent.devops.project.api.service.ServiceAllocIdResource
+import java.time.LocalDateTime
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
 
 @Service
 class PublicVarService @Autowired constructor(
@@ -66,7 +65,6 @@ class PublicVarService @Autowired constructor(
     private val publicVarGroupDao: PublicVarGroupDao,
     private val publicVarGroupReferInfoDao: PublicVarGroupReferInfoDao,
     private val publicVarReferInfoDao: PublicVarReferInfoDao,
-    private val publicVarVersionSummaryDao: PublicVarVersionSummaryDao,
     private val publicVarGroupReleaseRecordService: PublicVarGroupReleaseRecordService
 ) {
 
