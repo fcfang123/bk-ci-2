@@ -316,35 +316,25 @@ class PublicVarGroupReferQueryService @Autowired constructor(
                 )
             }
 
-            // Step1: 获取有实际变量引用的 referId 列表
-            val referIdsWithActualVar = publicVarReferInfoDao.listReferIdsWithActualVarRefer(
-                dslContext = dslContext,
-                projectId = projectId,
-                groupName = groupName,
-                referType = queryReq.referType
-            )
-
-            // Step2: 先查询分页数据列表（避免 UNION ALL 执行两次）
-            val varGroupReferInfo = publicVarGroupReferInfoDao.listLatestActiveVarGroupReferInfo(
+            // Step1: 查询分页数据列表（取每个 referId 的最新 referVersion）
+            val varGroupReferInfo = publicVarGroupReferInfoDao.listLatestVersionVarGroupReferInfo(
                 dslContext = dslContext,
                 projectId = projectId,
                 groupName = groupName,
                 referType = queryReq.referType,
-                referIdsWithActualVar = referIdsWithActualVar,
                 page = queryReq.page,
                 pageSize = queryReq.pageSize
             )
 
-            // Step3: 推断 totalCount，首页且结果不满一页时直接计算，避免重复执行 UNION ALL count 查询
+            // Step2: 推断 totalCount
             val totalCount = if (queryReq.page == 1 && varGroupReferInfo.size < queryReq.pageSize) {
                 varGroupReferInfo.size
             } else {
-                publicVarGroupReferInfoDao.countLatestActiveVarGroupReferInfo(
+                publicVarGroupReferInfoDao.countLatestVersionVarGroupReferInfo(
                     dslContext = dslContext,
                     projectId = projectId,
                     groupName = groupName,
-                    referType = queryReq.referType,
-                    referIdsWithActualVar = referIdsWithActualVar
+                    referType = queryReq.referType
                 )
             }
 
@@ -355,7 +345,7 @@ class PublicVarGroupReferQueryService @Autowired constructor(
                 )
             }
 
-            // Step4: 统计每个 referId 在活跃版本中的变量引用数量（跨版本同一变量计为1）
+            // Step3: 统计每个 referId 在最新版本中的变量引用数量
             val referIdVersions = varGroupReferInfo
                 .groupBy { it.referId }
                 .mapValues { (_, referInfos) -> referInfos.map { it.referVersion } }
@@ -415,28 +405,26 @@ class PublicVarGroupReferQueryService @Autowired constructor(
                 )
             }
 
-            // Step2: 先查询分页数据列表（避免 UNION ALL 执行两次）
-            val varGroupReferInfo = publicVarGroupReferInfoDao.listLatestActiveVarGroupReferInfoByReferIds(
+            // Step2: 查询分页数据列表（取每个 referId 的最新 referVersion）
+            val varGroupReferInfo = publicVarGroupReferInfoDao.listLatestVersionVarGroupReferInfoByReferIds(
                 dslContext = dslContext,
                 projectId = projectId,
                 referIds = referIdsWithActualVar,
                 referType = queryReq.referType,
-                referIdsWithActualVar = referIdsWithActualVar,
                 page = queryReq.page,
                 pageSize = queryReq.pageSize,
                 groupName = groupName
             )
 
-            // Step3: 推断 totalCount，首页且结果不满一页时直接计算，避免重复执行 UNION ALL count 查询
+            // Step3: 推断 totalCount
             val totalCount = if (queryReq.page == 1 && varGroupReferInfo.size < queryReq.pageSize) {
                 varGroupReferInfo.size
             } else {
-                publicVarGroupReferInfoDao.countLatestActiveVarGroupReferInfoByReferIds(
+                publicVarGroupReferInfoDao.countLatestVersionVarGroupReferInfoByReferIds(
                     dslContext = dslContext,
                     projectId = projectId,
                     referIds = referIdsWithActualVar,
                     referType = queryReq.referType,
-                    referIdsWithActualVar = referIdsWithActualVar,
                     groupName = groupName
                 )
             }
@@ -445,7 +433,7 @@ class PublicVarGroupReferQueryService @Autowired constructor(
                 "Query result: totalCount=$totalCount, returnedCount=${varGroupReferInfo.size}"
             )
 
-            // Step4: 统计每个 referId 在活跃版本中的变量引用数量（跨版本同一变量计为1）
+            // Step4: 统计每个 referId 在最新版本中的变量引用数量
             val referIdVersions = varGroupReferInfo
                 .groupBy { it.referId }
                 .mapValues { (_, referInfos) -> referInfos.map { it.referVersion } }
