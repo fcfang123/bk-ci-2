@@ -2,12 +2,13 @@ package com.tencent.devops.ai.service
 
 import com.tencent.devops.ai.constant.AiMessageCode
 import com.tencent.devops.ai.dao.UserLlmConfigDao
-import com.tencent.devops.ai.dao.UserLlmStoredConfig
 import com.tencent.devops.ai.pojo.UserLlmConfigInfo
 import com.tencent.devops.ai.pojo.UserLlmConfigUpsertRequest
 import com.tencent.devops.ai.properties.AiLlmModelProperties
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.util.AESUtil
+import com.tencent.devops.model.ai.tables.TAiUserLlmConfig
+import com.tencent.devops.model.ai.tables.records.TAiUserLlmConfigRecord
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -34,11 +35,11 @@ class UserLlmConfigService @Autowired constructor(
         val existing = dao.getByUserId(dslContext, userId)
         val encryptedApiKey = resolveEncryptedSecret(
             incomingValue = request.apiKey,
-            existingValue = existing?.encryptedApiKey ?: ""
+            existingValue = existing?.apiKey ?: ""
         )
         val encryptedBkAppSecret = resolveEncryptedSecret(
             incomingValue = request.bkAppSecret,
-            existingValue = existing?.encryptedBkAppSecret ?: ""
+            existingValue = existing?.bkAppSecret ?: ""
         )
         validateRequest(
             request = request,
@@ -46,28 +47,26 @@ class UserLlmConfigService @Autowired constructor(
             encryptedBkAppSecret = encryptedBkAppSecret
         )
         val now = java.time.LocalDateTime.now()
-        dao.upsert(
-            dslContext = dslContext,
-            config = UserLlmStoredConfig(
-                userId = userId,
-                baseUrl = request.baseUrl.trim(),
-                modelName = request.modelName.trim(),
-                encryptedApiKey = encryptedApiKey,
-                bkAppCode = request.bkAppCode.trim(),
-                encryptedBkAppSecret = encryptedBkAppSecret,
-                enabled = request.enabled,
-                connectTimeoutSeconds = request.connectTimeoutSeconds,
-                readTimeoutSeconds = request.readTimeoutSeconds,
-                writeTimeoutSeconds = request.writeTimeoutSeconds,
-                executionTimeoutSeconds = request.executionTimeoutSeconds,
-                maxAttempts = request.maxAttempts,
-                initialBackoffSeconds = request.initialBackoffSeconds,
-                maxBackoffSeconds = request.maxBackoffSeconds,
-                backoffMultiplier = request.backoffMultiplier,
-                createdTime = existing?.createdTime ?: now,
-                updatedTime = now
-            )
-        )
+        val record = dslContext.newRecord(TAiUserLlmConfig.T_AI_USER_LLM_CONFIG).apply {
+            this.userId = userId
+            baseUrl = request.baseUrl.trim()
+            modelName = request.modelName.trim()
+            apiKey = encryptedApiKey
+            bkAppCode = request.bkAppCode.trim()
+            bkAppSecret = encryptedBkAppSecret
+            enabled = request.enabled
+            connectTimeoutSeconds = request.connectTimeoutSeconds
+            readTimeoutSeconds = request.readTimeoutSeconds
+            writeTimeoutSeconds = request.writeTimeoutSeconds
+            executionTimeoutSeconds = request.executionTimeoutSeconds
+            maxAttempts = request.maxAttempts
+            initialBackoffSeconds = request.initialBackoffSeconds
+            maxBackoffSeconds = request.maxBackoffSeconds
+            backoffMultiplier = request.backoffMultiplier
+            createdTime = existing?.createdTime ?: now
+            updatedTime = now
+        }
+        dao.upsert(dslContext, record)
         logger.info(
             "[UserLlmConfig] Upserted config: userId={}, modelName={}, enabled={}",
             userId,
@@ -87,14 +86,14 @@ class UserLlmConfigService @Autowired constructor(
 
     fun getEnabledModel(userId: String): AiLlmModelProperties? {
         val config = dao.getByUserId(dslContext, userId) ?: return null
-        if (!config.enabled) return null
+        if (config.enabled != true) return null
         return AiLlmModelProperties(
             id = "user-$userId",
             baseUrl = config.baseUrl,
             modelName = config.modelName,
-            apiKey = decryptIfPresent(config.encryptedApiKey),
+            apiKey = decryptIfPresent(config.apiKey ?: ""),
             bkAppCode = config.bkAppCode,
-            bkAppSecret = decryptIfPresent(config.encryptedBkAppSecret),
+            bkAppSecret = decryptIfPresent(config.bkAppSecret ?: ""),
             connectTimeoutSeconds = config.connectTimeoutSeconds,
             readTimeoutSeconds = config.readTimeoutSeconds,
             writeTimeoutSeconds = config.writeTimeoutSeconds,
@@ -164,15 +163,15 @@ class UserLlmConfigService @Autowired constructor(
         }
     }
 
-    private fun UserLlmStoredConfig.toInfo(): UserLlmConfigInfo {
+    private fun TAiUserLlmConfigRecord.toInfo(): UserLlmConfigInfo {
         return UserLlmConfigInfo(
             userId = userId,
             baseUrl = baseUrl,
             modelName = modelName,
-            hasApiKey = encryptedApiKey.isNotBlank(),
+            hasApiKey = !apiKey.isNullOrBlank(),
             bkAppCode = bkAppCode,
-            hasBkAppSecret = encryptedBkAppSecret.isNotBlank(),
-            enabled = enabled,
+            hasBkAppSecret = !bkAppSecret.isNullOrBlank(),
+            enabled = enabled == true,
             connectTimeoutSeconds = connectTimeoutSeconds,
             readTimeoutSeconds = readTimeoutSeconds,
             writeTimeoutSeconds = writeTimeoutSeconds,
