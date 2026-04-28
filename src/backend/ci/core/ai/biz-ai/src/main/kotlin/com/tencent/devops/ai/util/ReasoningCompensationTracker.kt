@@ -27,13 +27,7 @@
 
 package com.tencent.devops.ai.util
 
-import com.tencent.devops.ai.dao.AiMessageDao
-import com.tencent.devops.ai.dao.AiSessionDao
-import com.tencent.devops.common.api.util.UUIDUtil
 import io.agentscope.core.agui.event.AguiEvent
-import org.jooq.DSLContext
-import java.util.UUID
-import kotlin.math.exp
 
 /**
  * 跟踪单次 run 的事件流，检测 reasoning-only 场景并生成补偿事件。
@@ -46,10 +40,7 @@ import kotlin.math.exp
  */
 class ReasoningCompensationTracker(
     private val threadId: String,
-    private val runId: String,
-    private val aiMessageDao: AiMessageDao,
-    private val dslContext: DSLContext,
-    private val aiSessionDao: AiSessionDao
+    private val runId: String
 ) {
     private var hasTextMessage = false
     private var hasReasoningMessage = false
@@ -85,32 +76,22 @@ class ReasoningCompensationTracker(
 
     fun needsCompensation(): Boolean = hasReasoningMessage && !hasTextMessage && lastReasoningBuffer.isNotEmpty()
 
-    fun buildCompensationEvents(): List<AguiEvent> {
-        val msgId = UUID.randomUUID().toString()
-        val text = lastReasoningBuffer.toString()
-        val role = "assistant"
-        val nextIndex = aiMessageDao.getMaxIndex(
-            dslContext = dslContext,
-            sessionId = threadId
-        ) + 1
-        aiMessageDao.create(
-            dslContext = dslContext,
-            id = msgId,
-            sessionId = threadId,
-            role = role,
-            content = text,
-            messageIndex = nextIndex,
-            extraData = null
-        )
-        aiSessionDao.updateTime(dslContext, threadId)
+    fun compensationText(): String = lastReasoningBuffer.toString()
+
+    fun buildCompensationEvents(msgId: String): List<AguiEvent> {
+        val text = compensationText()
         return listOf(
             AguiEvent.TextMessageStart(
-                threadId, runId, msgId, role
+                threadId, runId, msgId, ROLE_ASSISTANT
             ),
             AguiEvent.TextMessageContent(
                 threadId, runId, msgId, text
             ),
             AguiEvent.TextMessageEnd(threadId, runId, msgId)
         )
+    }
+
+    companion object {
+        const val ROLE_ASSISTANT = "assistant"
     }
 }
