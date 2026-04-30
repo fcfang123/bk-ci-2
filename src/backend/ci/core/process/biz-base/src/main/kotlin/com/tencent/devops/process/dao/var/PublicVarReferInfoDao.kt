@@ -28,6 +28,7 @@
 package com.tencent.devops.process.dao.`var`
 
 import com.tencent.devops.common.pipeline.enums.PublicVarGroupReferenceTypeEnum
+import com.tencent.devops.model.process.tables.TResourcePublicVarGroupReferInfo
 import com.tencent.devops.model.process.tables.TResourcePublicVarReferInfo
 import com.tencent.devops.process.pojo.`var`.po.ResourcePublicVarReferPO
 import org.jooq.DSLContext
@@ -548,7 +549,11 @@ class PublicVarReferInfoDao {
     }
 
     /**
-     * 查询指定变量组下有实际变量引用的不同 referId 列表
+     * 查询指定变量组下有实际变量引用的不同 referId 列表（无版本过滤）。
+     *
+     * 注意: 此方法不校验变量级记录的 REFER_VERSION 与组级表最新版本是否一致，
+     * 可能返回"僵尸数据"导致的误报。仅用于不需要版本一致性的场景。
+     *
      * @param dslContext 数据库上下文
      * @param projectId 项目ID
      * @param groupName 变量组名
@@ -577,5 +582,44 @@ class PublicVarReferInfoDao {
                 .fetch()
                 .map { it.value1() }
         }
+    }
+
+    /**
+     * @param dslContext 数据库上下文
+     * @param projectId 项目ID
+     * @param groupName 变量组名
+     * @param referType 引用类型（可选）
+     * @param varName 变量名（可选）
+     * @return 版本一致的 referId 列表（每个 referId 的变量引用均在 LATEST 版本中真实存在）
+     */
+    fun listReferIdsWithActualVarReferJoinLatestVersion(
+        dslContext: DSLContext,
+        projectId: String,
+        groupName: String,
+        referType: PublicVarGroupReferenceTypeEnum? = null,
+        varName: String? = null
+    ): List<String> {
+        val trpvri = TResourcePublicVarReferInfo.T_RESOURCE_PUBLIC_VAR_REFER_INFO
+        val trpvgri = TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO
+
+        val baseConditions = mutableListOf(
+            trpvri.PROJECT_ID.eq(projectId),
+            trpvri.GROUP_NAME.eq(groupName),
+            trpvgri.REFER_VERSION.eq(trpvri.REFER_VERSION),
+            trpvgri.LATEST_FLAG.eq(true)
+        )
+        referType?.let { baseConditions.add(trpvri.REFER_TYPE.eq(it.name).and(trpvgri.REFER_TYPE.eq(it.name))) }
+        varName?.let { baseConditions.add(trpvri.VAR_NAME.eq(it)) }
+
+        return dslContext.selectDistinct(trpvri.REFER_ID)
+            .from(trpvri)
+            .innerJoin(trpvgri)
+            .on(trpvgri.PROJECT_ID.eq(trpvri.PROJECT_ID))
+            .and(trpvgri.REFER_ID.eq(trpvri.REFER_ID))
+            .and(trpvgri.REFER_TYPE.eq(trpvri.REFER_TYPE))
+            .and(trpvgri.GROUP_NAME.eq(trpvri.GROUP_NAME))
+            .where(baseConditions)
+            .fetch()
+            .map { it.value1() }
     }
 }

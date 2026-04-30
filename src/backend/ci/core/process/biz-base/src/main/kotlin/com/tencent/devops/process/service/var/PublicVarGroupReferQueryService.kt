@@ -368,11 +368,11 @@ class PublicVarGroupReferQueryService @Autowired constructor(
     }
 
     /**
-     * 根据变量名查询变量组变量引用信息（每个 referId 只返回最大版本）
+     * 根据变量名查询变量组变量引用信息
      * @param queryReq 查询请求
      * @param groupName 变量组名
      * @param varName 变量名
-     * @return 变量组引用信息查询结果（每个 referId 只包含最大版本）
+     * @return 变量组引用信息查询结果
      */
     private fun queryVarGroupReferInfoByVarNameAllVersions(
         queryReq: PublicVarGroupInfoQueryReqDTO,
@@ -383,7 +383,7 @@ class PublicVarGroupReferQueryService @Autowired constructor(
 
         try {
             // Step1: 获取有实际变量引用的 referId 列表（按 varName 过滤）
-            val referIdsWithActualVar = publicVarReferInfoDao.listReferIdsWithActualVarRefer(
+            val referIdsWithActualVar = publicVarReferInfoDao.listReferIdsWithActualVarReferJoinLatestVersion(
                 dslContext = dslContext,
                 projectId = projectId,
                 groupName = groupName,
