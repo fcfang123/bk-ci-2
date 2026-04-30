@@ -123,6 +123,7 @@ import com.tencent.devops.process.pojo.setting.PipelineModelVersion
 import com.tencent.devops.process.pojo.`var`.dto.PublicVarGroupReferDTO
 import com.tencent.devops.process.service.PipelineAsCodeService
 import com.tencent.devops.process.service.PipelineOperationLogService
+import com.tencent.devops.process.service.label.PipelineGroupService
 import com.tencent.devops.process.service.pipeline.PipelineSettingVersionService
 import com.tencent.devops.process.service.pipeline.PipelineTransferYamlService
 import com.tencent.devops.process.service.`var`.PublicVarGroupReferManageService
@@ -187,6 +188,7 @@ class PipelineRepositoryService constructor(
     private val subPipelineTaskService: SubPipelineTaskService,
     private val pipelineInfoService: PipelineInfoService,
     private val pipelineTemplateInfoDao: PipelineTemplateInfoDao,
+    private val pipelineGroupService: PipelineGroupService,
     private val publicVarGroupReferManageService: PublicVarGroupReferManageService
 ) {
 
@@ -1906,6 +1908,27 @@ class PipelineRepositoryService constructor(
 
     fun getSetting(projectId: String, pipelineId: String): PipelineSetting? {
         return pipelineSettingDao.getSetting(dslContext, projectId, pipelineId)
+    }
+
+    /**
+     * settingVersion表中labels字段可能为空(如实例化流水线),需要单独再查询
+     */
+    fun getSettingWithLabels(userId: String, projectId: String, pipelineId: String): PipelineSetting? {
+        val labels = ArrayList<String>()
+        val labelNames = ArrayList<String>()
+        pipelineGroupService.getGroups(
+            userId = userId,
+            projectId = projectId,
+            pipelineId = pipelineId
+        ).forEach {
+            labels.addAll(it.labels)
+            labelNames.addAll(it.labelNames)
+        }
+        return pipelineSettingDao.getSetting(
+            dslContext = dslContext,
+            projectId = projectId,
+            pipelineId = pipelineId
+        )?.copy(labels = labels, labelNames = labelNames)
     }
 
     fun getSettingByPipelineVersion(

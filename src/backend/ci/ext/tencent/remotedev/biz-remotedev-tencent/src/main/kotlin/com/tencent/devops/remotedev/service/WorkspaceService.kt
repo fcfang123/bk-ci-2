@@ -111,6 +111,8 @@ import com.tencent.devops.remotedev.pojo.project.RemotedevProject
 import com.tencent.devops.remotedev.pojo.project.RemotedevProjectNew
 import com.tencent.devops.remotedev.pojo.project.WeSecProjectWorkspace
 import com.tencent.devops.remotedev.pojo.project.WorkspaceProperty
+import com.tencent.devops.remotedev.pojo.tai.CertExchangeCodeReq
+import com.tencent.devops.remotedev.pojo.tai.CertExchangeCodeResp
 import com.tencent.devops.remotedev.pojo.tai.Moa2faReqData
 import com.tencent.devops.remotedev.pojo.tai.Moa2faRespData
 import com.tencent.devops.remotedev.pojo.tai.Moa2faVerifyReqData
@@ -580,7 +582,7 @@ class WorkspaceService @Autowired constructor(
         val records = parseWorkspaceList(
             userId = userId,
             result = result,
-            enableExportSup = true,
+            enableExportSup = false,
             expertSupId = data.expertSupId
         )
 
@@ -834,6 +836,8 @@ class WorkspaceService @Autowired constructor(
                     val info = client.get(ServiceTxUserResource::class).get(owner).data
                     listOf(
                         DepartmentsInfo(
+                            bgId = info?.bgId,
+                            bgName = info?.bgName,
                             deptId = info?.deptId,
                             deptName = info?.deptName
                         )
@@ -1705,6 +1709,10 @@ class WorkspaceService @Autowired constructor(
         return taiService.verifyMoa2faRequest(userId = userId, moa2faVerifyReqData = moa2faVerifyReqData)
     }
 
+    fun getCertExchangeCode(userId: String, req: CertExchangeCodeReq): CertExchangeCodeResp {
+        return taiService.getCertExchangeCode(userId = userId, req = req)
+    }
+
     fun checkExistWorkspaceSharedInfo(
         workspaceName: String,
         sharedUser: String,
@@ -1760,6 +1768,31 @@ class WorkspaceService @Autowired constructor(
             )
         }
     }
+
+    fun batchGetSimpleWorkspaces(
+        projectId: String,
+        workspaceNames: List<String>
+    ): List<WeSecProjectWorkspace> {
+        val records = workspaceDao.fetchByProjectAndNames(
+            dslContext, projectId, workspaceNames
+        )
+        return records.map { it.toSimpleWeSecWorkspace() }
+    }
+
+    private fun WorkspaceRecord.toSimpleWeSecWorkspace() =
+        WeSecProjectWorkspace(
+            workspaceName = workspaceName,
+            projectId = projectId,
+            creator = createUserId,
+            owner = createUserId,
+            createTime = DateTimeUtil.toDateTime(createTime),
+            regionId = "",
+            innerIp = ip,
+            status = status.name,
+            displayName = displayName,
+            ownerDepartments = null,
+            currentLoginUsers = null
+        )
 
     companion object {
         private val logger = LoggerFactory.getLogger(WorkspaceService::class.java)
