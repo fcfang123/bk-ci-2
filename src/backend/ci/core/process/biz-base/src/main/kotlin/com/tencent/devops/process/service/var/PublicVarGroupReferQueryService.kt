@@ -41,15 +41,14 @@ import com.tencent.devops.process.dao.`var`.PublicVarDao
 import com.tencent.devops.process.dao.`var`.PublicVarGroupDao
 import com.tencent.devops.process.dao.`var`.PublicVarGroupReferInfoDao
 import com.tencent.devops.process.dao.`var`.PublicVarReferInfoDao
-import com.tencent.devops.process.dao.`var`.PublicVarVersionSummaryDao
 import com.tencent.devops.process.engine.dao.template.TemplatePipelineDao
+import com.tencent.devops.process.pojo.template.v2.PipelineTemplateResourceCommonCondition
+import com.tencent.devops.process.pojo.template.v2.TemplateVersionPair
 import com.tencent.devops.process.pojo.`var`.VarGroupReferInfoQueryResult
 import com.tencent.devops.process.pojo.`var`.`do`.PublicGroupVarRefDO
 import com.tencent.devops.process.pojo.`var`.`do`.PublicVarDO
 import com.tencent.devops.process.pojo.`var`.dto.PublicVarGroupInfoQueryReqDTO
 import com.tencent.devops.process.pojo.`var`.po.ResourcePublicVarGroupReferPO
-import com.tencent.devops.process.pojo.template.v2.PipelineTemplateResourceCommonCondition
-import com.tencent.devops.process.pojo.template.v2.TemplateVersionPair
 import java.time.LocalDateTime
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
@@ -71,7 +70,6 @@ class PublicVarGroupReferQueryService @Autowired constructor(
     private val publicVarGroupReferInfoDao: PublicVarGroupReferInfoDao,
     private val templatePipelineDao: TemplatePipelineDao,
     private val publicVarDao: PublicVarDao,
-    private val publicVarVersionSummaryDao: PublicVarVersionSummaryDao,
     private val publicVarService: PublicVarService
 ) {
 

@@ -31,7 +31,6 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.pipeline.enums.PublicVarGroupReferenceTypeEnum
 import com.tencent.devops.model.process.tables.TResourcePublicVarGroupReferInfo
-import com.tencent.devops.model.process.tables.TResourcePublicVarReferInfo
 import com.tencent.devops.model.process.tables.records.TResourcePublicVarGroupReferInfoRecord
 import com.tencent.devops.process.pojo.`var`.po.PublicVarPositionPO
 import com.tencent.devops.process.pojo.`var`.po.ResourcePublicVarGroupReferPO
@@ -180,7 +179,9 @@ class PublicVarGroupReferInfoDao {
                 json = it,
                 typeReference = object : TypeReference<List<PublicVarPositionPO>>() {}
             )
-        })
+        },
+        latestFlag = publicVarGroupReferInfoRecord.latestFlag ?: false
+    )
 
     /**
      * 检查指定 referId 是否存在对指定 groupName + version 组合的引用记录
@@ -324,7 +325,8 @@ class PublicVarGroupReferInfoDao {
                     CREATOR,
                     MODIFIER,
                     CREATE_TIME,
-                    UPDATE_TIME
+                    UPDATE_TIME,
+                    LATEST_FLAG
                 ).values(
                     po.id,
                     po.projectId,
@@ -339,22 +341,97 @@ class PublicVarGroupReferInfoDao {
                     po.creator,
                     po.modifier,
                     po.createTime,
-                    po.updateTime
+                    po.updateTime,
+                    po.latestFlag
                 ).onDuplicateKeyUpdate()
                     .set(REFER_NAME, po.referName)
                     .set(REFER_VERSION_NAME, po.referVersionName)
                     .set(POSITION_INFO, po.positionInfo?.let { JsonUtil.toJson(it, false) })
                     .set(MODIFIER, po.modifier)
                     .set(UPDATE_TIME, po.updateTime)
+                    .set(LATEST_FLAG, po.latestFlag)
             }
             dslContext.batch(insertSteps).execute()
         }
     }
 
     /**
+     * 将指定 referId+groupName 下所有记录的 LATEST_FLAG 置为 false（清除"最新引用"标记）。
+     * 用于：
+     * - 用户保存新版本时，先把历史版本的 LATEST_FLAG 全部置为 false，再把当前 referVersion 置为 true。
+     * - 用户卸载变量组（新版本不再引用）时，把该 referId+groupName 的所有行置为 false。
+     */
+    fun clearLatestFlag(
+        dslContext: DSLContext,
+        projectId: String,
+        referId: String,
+        referType: PublicVarGroupReferenceTypeEnum,
+        groupName: String
+    ): Int {
+        with(TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO) {
+            return dslContext.update(this)
+                .set(LATEST_FLAG, false)
+                .where(PROJECT_ID.eq(projectId))
+                .and(REFER_ID.eq(referId))
+                .and(REFER_TYPE.eq(referType.name))
+                .and(GROUP_NAME.eq(groupName))
+                .and(LATEST_FLAG.eq(true))
+                .execute()
+        }
+    }
+
+    /**
+     * 将指定 referId+groupName+referVersion 的记录的 LATEST_FLAG 置为 true。
+     * 配合 clearLatestFlag 使用：先 clear 再 set，保证同一 referId+groupName 下只有一条 LATEST_FLAG=true。
+     */
+    fun setLatestFlag(
+        dslContext: DSLContext,
+        projectId: String,
+        referId: String,
+        referType: PublicVarGroupReferenceTypeEnum,
+        groupName: String,
+        referVersion: Int
+    ): Int {
+        with(TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO) {
+            return dslContext.update(this)
+                .set(LATEST_FLAG, true)
+                .where(PROJECT_ID.eq(projectId))
+                .and(REFER_ID.eq(referId))
+                .and(REFER_TYPE.eq(referType.name))
+                .and(GROUP_NAME.eq(groupName))
+                .and(REFER_VERSION.eq(referVersion))
+                .execute()
+        }
+    }
+
+    /**
+     * 查询指定 referId 当前 LATEST_FLAG=true 的所有 groupName。
+     * 用于在保存流水线/模板时，判断是否需要把某些"已被卸载"的 groupName 的 LATEST_FLAG 清零。
+     */
+    fun listLatestFlagGroupNamesByReferId(
+        dslContext: DSLContext,
+        projectId: String,
+        referId: String,
+        referType: PublicVarGroupReferenceTypeEnum
+    ): Set<String> {
+        with(TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO) {
+            return dslContext.selectDistinct(GROUP_NAME)
+                .from(this)
+                .where(PROJECT_ID.eq(projectId))
+                .and(REFER_ID.eq(referId))
+                .and(REFER_TYPE.eq(referType.name))
+                .and(LATEST_FLAG.eq(true))
+                .fetch()
+                .map { it.value1() }
+                .toSet()
+        }
+    }
+
+    /**
      * 构建关联变量组最新版本的查询
-     * 最新版本定义：每个 referId + groupName 组合下的最大 referVersion
-     * 草稿 referVersion > 正式版 referVersion，因此草稿自然优先
+     * 语义：返回 referId 当前最新有效引用的变量组记录（LATEST_FLAG=true）。
+     * 当用户保存流水线新版本时，保存逻辑会把历史版本的 LATEST_FLAG 置为 false，
+     * 只保留当前最新版本 LATEST_FLAG=true；卸载变量组时所有行都会被置 false。
      * 两种过滤维度：
      * - 按 groupName 过滤：传入 groupName 参数，referIds 为 null
      * - 按 referIds 过滤：传入 referIds 参数，groupName 为 null
@@ -374,26 +451,17 @@ class PublicVarGroupReferInfoDao {
         referType: PublicVarGroupReferenceTypeEnum?
     ): Select<*> {
         val t = TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO
-        val sub = t.`as`("sub")
 
         // 构建基础过滤条件
-        val conditions = mutableListOf(t.PROJECT_ID.eq(projectId))
+        val conditions = mutableListOf(
+            t.PROJECT_ID.eq(projectId),
+            t.LATEST_FLAG.eq(true)
+        )
         groupName?.let { conditions.add(t.GROUP_NAME.eq(it)) }
         referIds?.let { conditions.add(t.REFER_ID.`in`(it)) }
         referType?.let { conditions.add(t.REFER_TYPE.eq(it.name)) }
 
-        // NOT EXISTS：同 referId + groupName 没有更高 referVersion
-        var notExistsHigher = dslContext.selectOne()
-            .from(sub)
-            .where(sub.PROJECT_ID.eq(t.PROJECT_ID))
-            .and(sub.REFER_ID.eq(t.REFER_ID))
-            .and(sub.GROUP_NAME.eq(t.GROUP_NAME))
-            .and(sub.REFER_VERSION.gt(t.REFER_VERSION))
-        referType?.let { notExistsHigher = notExistsHigher.and(sub.REFER_TYPE.eq(it.name)) }
-
-        return dslContext.selectFrom(t)
-            .where(conditions)
-            .and(DSL.notExists(notExistsHigher))
+        return dslContext.selectFrom(t).where(conditions)
     }
 
     /**

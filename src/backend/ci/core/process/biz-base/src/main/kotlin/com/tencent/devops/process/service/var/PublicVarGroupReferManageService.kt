@@ -293,6 +293,12 @@ class PublicVarGroupReferManageService @Autowired constructor(
                 if (publicVarGroupReferDTO.draftFlag) {
                     handleDraftReferCountUpdate(publicVarGroupReferDTO, emptyList(), emptyList())
                 }
+                // 本次保存没有任何变量组引用，把该 referId 下所有 LATEST_FLAG=true 的记录置为 false
+                // （覆盖场景：用户保存新版本时卸载了之前所有的变量组引用）
+                syncLatestFlagForAllGroups(
+                    publicVarGroupReferDTO = publicVarGroupReferDTO,
+                    currentGroupNames = emptySet()
+                )
                 return
             }
             model.handlePublicVarInfo()
@@ -319,6 +325,15 @@ class PublicVarGroupReferManageService @Autowired constructor(
                     currentReferPOs = pipelinePublicVarGroupReferPOs
                 )
             }
+            // 同步 LATEST_FLAG：让 (referId, groupName) 的 LATEST_FLAG=true 只留在当前 referVersion 的行
+            // 涉及的 groupName = 当前引用的 ∪ 历史引用的（保证从"有引用"变为"无引用"的组也能被置 false）
+            val currentGroupNames = publicVarGroups?.map { it.groupName }?.toSet() ?: emptySet()
+            val historicalGroupNames = historicalReferInfos.map { it.groupName }.toSet()
+            syncLatestFlagForAllGroups(
+                publicVarGroupReferDTO = publicVarGroupReferDTO,
+                currentGroupNames = currentGroupNames,
+                involvedGroupNames = currentGroupNames + historicalGroupNames
+            )
             logger.info("handleVarGroupReferBus completed, draftFlag=${publicVarGroupReferDTO.draftFlag}")
         } finally {
             lock.unlock()
@@ -334,6 +349,66 @@ class PublicVarGroupReferManageService @Autowired constructor(
                 resourceVersionName = publicVarGroupReferDTO.referVersionName
             )
         )
+    }
+
+    /**
+     * 同步 LATEST_FLAG：保证每个 (projectId, referId, referType, groupName) 下最多一条 LATEST_FLAG=true，
+     * 且该行对应 currentReferVersion（如果当前保存版本仍在引用该 groupName）。
+     * 处理逻辑：
+     * 1. 汇总需要同步的 groupName 集合（涉及 = 当前版本引用的 ∪ 历史曾引用的 ∪ DB 中当前 LATEST_FLAG=true 的）
+     * 2. 对每个 groupName：
+     *    - 先将该 (referId, groupName) 下所有 LATEST_FLAG=true 的行置为 false
+     *    - 若 currentGroupNames 包含该 groupName，则将当前 referVersion 对应行置为 true
+     * 外层已提供锁保护，此方法无需加锁。
+     */
+    private fun syncLatestFlagForAllGroups(
+        publicVarGroupReferDTO: PublicVarGroupReferDTO,
+        currentGroupNames: Set<String>,
+        involvedGroupNames: Set<String>? = null
+    ) {
+        val projectId = publicVarGroupReferDTO.projectId
+        val referId = publicVarGroupReferDTO.referId
+        val referType = publicVarGroupReferDTO.referType
+        val referVersion = publicVarGroupReferDTO.referVersion
+
+        // 汇总需要同步的 groupName：调用方传入的 + DB 中当前 LATEST_FLAG=true 的（覆盖完全卸载场景）
+        val groupNamesWithLatestFlag = publicVarGroupReferInfoDao.listLatestFlagGroupNamesByReferId(
+            dslContext = dslContext,
+            projectId = projectId,
+            referId = referId,
+            referType = referType
+        )
+        val groupsToSync = (involvedGroupNames ?: currentGroupNames) + groupNamesWithLatestFlag
+
+        if (groupsToSync.isEmpty()) return
+
+        groupsToSync.forEach { groupName ->
+            // 将该 (referId, groupName) 下所有行的 LATEST_FLAG 置为 false
+            publicVarGroupReferInfoDao.clearLatestFlag(
+                dslContext = dslContext,
+                projectId = projectId,
+                referId = referId,
+                referType = referType,
+                groupName = groupName
+            )
+            // 若当前版本仍引用该变量组，把当前 referVersion 行置为 true
+            if (groupName in currentGroupNames) {
+                val updated = publicVarGroupReferInfoDao.setLatestFlag(
+                    dslContext = dslContext,
+                    projectId = projectId,
+                    referId = referId,
+                    referType = referType,
+                    groupName = groupName,
+                    referVersion = referVersion
+                )
+                if (updated == 0) {
+                    logger.warn(
+                        "syncLatestFlag: no row updated to true, " +
+                            "referId=$referId, groupName=$groupName, referVersion=$referVersion"
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -592,8 +667,8 @@ class PublicVarGroupReferManageService @Autowired constructor(
                     "publicVarGroupNames: $publicVarGroupNames, " +
                     "resourcePublicVarGroupReferPOS size: ${resourcePublicVarGroupReferPOS.size}"
         )
-        if (publicVarGroupNames.isEmpty() && resourcePublicVarGroupReferPOS.isEmpty()
-            && historicalReferInfos.isEmpty()) {
+        if (publicVarGroupNames.isEmpty() &&
+            resourcePublicVarGroupReferPOS.isEmpty() && historicalReferInfos.isEmpty()) {
             return
         }
         try {
