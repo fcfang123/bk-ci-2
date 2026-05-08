@@ -394,11 +394,11 @@ class PublicVarGroupReferQueryService @Autowired constructor(
     }
 
     /**
-     * 根据变量名查询变量组变量引用信息
+     * 根据变量名查询变量组变量引用信息（每个 referId 只返回最大版本）
      * @param queryReq 查询请求
      * @param groupName 变量组名
      * @param varName 变量名
-     * @return 变量组引用信息查询结果
+     * @return 变量组引用信息查询结果（每个 referId 只包含最大版本）
      */
     private fun queryVarGroupReferInfoByVarNameAllVersions(
         queryReq: PublicVarGroupInfoQueryReqDTO,
@@ -409,7 +409,7 @@ class PublicVarGroupReferQueryService @Autowired constructor(
 
         try {
             // Step1: 获取有实际变量引用的 referId 列表（按 varName 过滤）
-            val referIdsWithActualVar = publicVarReferInfoDao.listReferIdsWithActualVarReferJoinLatestVersion(
+            val referIdsWithActualVar = publicVarReferInfoDao.listReferIdsWithActualVarRefer(
                 dslContext = dslContext,
                 projectId = projectId,
                 groupName = groupName,
@@ -419,7 +419,7 @@ class PublicVarGroupReferQueryService @Autowired constructor(
 
             logger.info(
                 "Query var refer info: project=$projectId, group=$groupName, var=$varName, " +
-                "referType=${queryReq.referType?.name}, referIdCount=${referIdsWithActualVar.size}"
+                        "referType=${queryReq.referType?.name}, referIdCount=${referIdsWithActualVar.size}"
             )
 
             if (referIdsWithActualVar.isEmpty()) {
