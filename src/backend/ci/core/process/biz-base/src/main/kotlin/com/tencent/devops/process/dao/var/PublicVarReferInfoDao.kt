@@ -28,9 +28,9 @@
 package com.tencent.devops.process.dao.`var`
 
 import com.tencent.devops.common.pipeline.enums.PublicVarGroupReferenceTypeEnum
-import com.tencent.devops.model.process.tables.TResourcePublicVarGroupReferInfo
 import com.tencent.devops.model.process.tables.TResourcePublicVarReferInfo
 import com.tencent.devops.process.pojo.`var`.po.ResourcePublicVarReferPO
+import java.time.LocalDateTime
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
@@ -549,11 +549,7 @@ class PublicVarReferInfoDao {
     }
 
     /**
-     * 查询指定变量组下有实际变量引用的不同 referId 列表（无版本过滤）。
-     *
-     * 注意: 此方法不校验变量级记录的 REFER_VERSION 与组级表最新版本是否一致，
-     * 可能返回"僵尸数据"导致的误报。仅用于不需要版本一致性的场景。
-     *
+     * 查询指定变量组下有实际变量引用的不同 referId 列表
      * @param dslContext 数据库上下文
      * @param projectId 项目ID
      * @param groupName 变量组名
@@ -585,41 +581,47 @@ class PublicVarReferInfoDao {
     }
 
     /**
+     * 查询每个 referId 在其指定版本集合中变量引用记录的最早创建时间
+     * （即"变量引用产生的时间"）
      * @param dslContext 数据库上下文
      * @param projectId 项目ID
      * @param groupName 变量组名
-     * @param referType 引用类型（可选）
-     * @param varName 变量名（可选）
-     * @return 版本一致的 referId 列表（每个 referId 的变量引用均在 LATEST 版本中真实存在）
+     * @param referIdVersions referId -> 该 referId 关心的 referVersion 列表
+     * @param varName 可选，指定变量名时仅统计该变量的引用产生时间
+     * @return referId -> 最早的 createTime
      */
-    fun listReferIdsWithActualVarReferJoinLatestVersion(
+    fun getEarliestCreateTimeByGroupAndActiveVersions(
         dslContext: DSLContext,
         projectId: String,
         groupName: String,
-        referType: PublicVarGroupReferenceTypeEnum? = null,
+        referIdVersions: Map<String, List<Int>>,
         varName: String? = null
-    ): List<String> {
-        val trpvri = TResourcePublicVarReferInfo.T_RESOURCE_PUBLIC_VAR_REFER_INFO
-        val trpvgri = TResourcePublicVarGroupReferInfo.T_RESOURCE_PUBLIC_VAR_GROUP_REFER_INFO
+    ): Map<String, LocalDateTime> {
+        if (referIdVersions.isEmpty()) {
+            return emptyMap()
+        }
 
-        val baseConditions = mutableListOf(
-            trpvri.PROJECT_ID.eq(projectId),
-            trpvri.GROUP_NAME.eq(groupName),
-            trpvgri.REFER_VERSION.eq(trpvri.REFER_VERSION),
-            trpvgri.LATEST_FLAG.eq(true)
-        )
-        referType?.let { baseConditions.add(trpvri.REFER_TYPE.eq(it.name).and(trpvgri.REFER_TYPE.eq(it.name))) }
-        varName?.let { baseConditions.add(trpvri.VAR_NAME.eq(it)) }
+        with(TResourcePublicVarReferInfo.T_RESOURCE_PUBLIC_VAR_REFER_INFO) {
+            val versionConditions = referIdVersions.map { (referId, versions) ->
+                REFER_ID.eq(referId).and(REFER_VERSION.`in`(versions))
+            }.reduce { acc, condition -> acc.or(condition) }
 
-        return dslContext.selectDistinct(trpvri.REFER_ID)
-            .from(trpvri)
-            .innerJoin(trpvgri)
-            .on(trpvgri.PROJECT_ID.eq(trpvri.PROJECT_ID))
-            .and(trpvgri.REFER_ID.eq(trpvri.REFER_ID))
-            .and(trpvgri.REFER_TYPE.eq(trpvri.REFER_TYPE))
-            .and(trpvgri.GROUP_NAME.eq(trpvri.GROUP_NAME))
-            .where(baseConditions)
-            .fetch()
-            .map { it.value1() }
+            val query = dslContext.select(REFER_ID, DSL.min(CREATE_TIME))
+                .from(this)
+                .where(PROJECT_ID.eq(projectId))
+                .and(GROUP_NAME.eq(groupName))
+                .and(versionConditions)
+            if (!varName.isNullOrBlank()) {
+                query.and(VAR_NAME.eq(varName))
+            }
+            return query.groupBy(REFER_ID)
+                .fetch()
+                .mapNotNull { record ->
+                    val referId = record.getValue(REFER_ID) ?: return@mapNotNull null
+                    val earliest = record.getValue(1, LocalDateTime::class.java) ?: return@mapNotNull null
+                    referId to earliest
+                }
+                .toMap()
+        }
     }
 }
