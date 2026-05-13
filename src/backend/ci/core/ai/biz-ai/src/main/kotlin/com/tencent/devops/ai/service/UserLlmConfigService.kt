@@ -20,7 +20,7 @@ import java.time.ZoneOffset
 class UserLlmConfigService @Autowired constructor(
     private val dslContext: DSLContext,
     private val dao: UserLlmConfigDao,
-    @Value("\${aes.ai:#{null}}")
+    @Value("\${aes.aesKey}")
     private val aesKey: String = ""
 ) {
 
