@@ -465,39 +465,43 @@ export default defineComponent({
         <Loading loading={isLoadingModal.value}>
           <div class={styles.content}>
             <Form formType="vertical">
-              {/* Step ID config */}
+              {/* Step ID: same two-column split as plugin row; input only in first column (50%) */}
               {isAtomSelected.value && props.showStepIdField && (
-                <FormItem class={stepIdErrors.value.length > 0 ? sharedStyles.fieldError : ''}>
-                  {{
-                    label: () => (
-                      <div class={styles.labelWithIcon}>
-                        <span>{t('flow.orchestration.stepId')}</span>
-                        <Popover content={t('flow.orchestration.stepIdDesc')} placement="top">
-                          <span class={sharedStyles.infoIcon}>
-                            <SvgIcon name="info-circle" size={14} />
-                          </span>
-                        </Popover>
-                      </div>
-                    ),
-                    default: () => (
-                      <>
-                        <Input
-                          modelValue={props.element?.stepId || ''}
-                          placeholder={t('flow.orchestration.stepIdPlaceholder')}
-                          onChange={handleStepIdChange}
-                          class={styles.stepIdInput}
-                          disabled={!props.editable}
-                        />
-                        {stepIdErrors.value.includes('stepIdFormat') && (
-                          <div class={sharedStyles.fieldErrorMessage}>{t('flow.orchestration.stepIdFormatError')}</div>
-                        )}
-                        {stepIdErrors.value.includes('stepIdDuplicate') && (
-                          <div class={sharedStyles.fieldErrorMessage}>{t('flow.orchestration.stepIdDuplicateError')}</div>
-                        )}
-                      </>
-                    ),
-                  }}
-                </FormItem>
+                <div class={sharedStyles.propertyPanelHalfRow}>
+                  <div class={sharedStyles.propertyPanelHalfCell}>
+                    <FormItem class={stepIdErrors.value.length > 0 ? sharedStyles.fieldError : ''}>
+                      {{
+                        label: () => (
+                          <div class={styles.labelWithIcon}>
+                            <span>{t('flow.orchestration.stepId')}</span>
+                            <Popover content={t('flow.orchestration.stepIdDesc')} placement="top">
+                              <span class={sharedStyles.infoIcon}>
+                                <SvgIcon name="info-circle" size={14} />
+                              </span>
+                            </Popover>
+                          </div>
+                        ),
+                        default: () => (
+                          <>
+                            <Input
+                              modelValue={props.element?.stepId || ''}
+                              placeholder={t('flow.orchestration.stepIdPlaceholder')}
+                              onChange={handleStepIdChange}
+                              class={sharedStyles.propertyPanelHalfWidthInput}
+                              disabled={!props.editable}
+                            />
+                            {stepIdErrors.value.includes('stepIdFormat') && (
+                              <div class={sharedStyles.fieldErrorMessage}>{t('flow.orchestration.stepIdFormatError')}</div>
+                            )}
+                            {stepIdErrors.value.includes('stepIdDuplicate') && (
+                              <div class={sharedStyles.fieldErrorMessage}>{t('flow.orchestration.stepIdDuplicateError')}</div>
+                            )}
+                          </>
+                        ),
+                      }}
+                    </FormItem>
+                  </div>
+                </div>
               )}
 
               {/* Plugin type and version displayed side by side */}
@@ -613,14 +617,9 @@ export default defineComponent({
                   {/* Custom environment variables */}
                   {props.showCustomEnvSection && (
                     <div class={styles.customEnvSection}>
-                      <Collapse useBlockTheme>
-                        <CollapsePanel>
+                      <Collapse useBlockTheme headerIconAlign="left">
+                        <CollapsePanel title={t('flow.orchestration.customEnv')}>
                           {{
-                            default: () => (
-                              <div class={sharedStyles.collapseHeader}>
-                                <span>{t('flow.orchestration.customEnv')}</span>
-                              </div>
-                            ),
                             content: () => (
                               <div class={sharedStyles.collapseContent}>
                                 <KeyValueMap
@@ -643,14 +642,12 @@ export default defineComponent({
                   {/* Flow control options */}
                   {props.showFlowControlSection && (
                     <div class={styles.processControlSection}>
-                      <Collapse modelValue={activeIndex.value} useBlockTheme>
-                        <CollapsePanel name="flowControl">
+                      <Collapse modelValue={activeIndex.value} useBlockTheme headerIconAlign="left">
+                        <CollapsePanel
+                          name="flowControl"
+                          title={t('flow.orchestration.flowControlOptions')}
+                        >
                           {{
-                            default: () => (
-                              <div class={sharedStyles.collapseHeader}>
-                                <span>{t('flow.orchestration.flowControlOptions')}</span>
-                              </div>
-                            ),
                             content: () => (
                               <div class={sharedStyles.collapseContent}>
                                 <Form labelWidth={120} formType="vertical">

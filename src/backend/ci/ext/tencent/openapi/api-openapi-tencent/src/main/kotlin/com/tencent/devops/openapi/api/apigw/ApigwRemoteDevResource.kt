@@ -22,7 +22,9 @@ import com.tencent.devops.remotedev.pojo.WorkspaceCloneReq
 import com.tencent.devops.remotedev.pojo.WorkspaceOpHistory
 import com.tencent.devops.remotedev.pojo.WorkspaceRebuildReq
 import com.tencent.devops.remotedev.pojo.WorkspaceRegistration
+import com.tencent.devops.remotedev.pojo.Workspace
 import com.tencent.devops.remotedev.pojo.WorkspaceSearch
+import com.tencent.devops.remotedev.pojo.WorkspaceStartCloudDetail
 import com.tencent.devops.remotedev.pojo.WorkspaceUpgradeReq
 import com.tencent.devops.remotedev.pojo.common.QuotaType
 import com.tencent.devops.remotedev.pojo.expert.CreateDiskResp
@@ -145,7 +147,10 @@ interface ApigwRemoteDevResource {
         envId: String?,
         @Parameter(description = "workspaceName", required = false)
         @QueryParam("workspaceName")
-        workspaceName: String?
+        workspaceName: String?,
+        @Parameter(description = "是否包含部门信息", required = false)
+        @QueryParam("hasDepartmentsInfo")
+        hasDepartmentsInfo: Boolean? = null
     ): Result<List<WeSecProjectWorkspace>>
 
     @Operation(summary = "提供给wesec获取云桌面信息", tags = ["v4_app_remotedev_project_list"])
@@ -1174,4 +1179,206 @@ interface ApigwRemoteDevResource {
         @QueryParam("workspaceName")
         workspaceName: String
     ): Result<Boolean>
+
+    @Operation(
+        summary = "实例转公共云桌面",
+        tags = ["v4_app_remotedev_convert_to_public_workspace"]
+    )
+    @POST
+    @Path("/convert_to_public_workspace")
+    fun convertToPublicWorkspace(
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "workspaceName",
+            required = true
+        )
+        @QueryParam("workspaceName")
+        workspaceName: String
+    ): Result<Boolean>
+
+    @Operation(
+        summary = "批量刷新实例状态",
+        tags = ["v4_app_remotedev_refresh_workspace_status"]
+    )
+    @POST
+    @Path("/refresh_workspace_status")
+    fun refreshWorkspaceStatus(
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "项目ID",
+            required = true
+        )
+        @QueryParam("projectId")
+        projectId: String,
+        @Parameter(
+            description = "实例ID列表",
+            required = true
+        )
+        instanceIds: List<String>
+    ): Result<Map<String, String>>
+
+    @Operation(
+        summary = "批量获取简易工作空间信息",
+        tags = [
+            "v4_app_remotedev_batch_get_simple_workspaces"
+        ]
+    )
+    @POST
+    @Path("/batch_get_simple_workspaces")
+    fun batchGetSimpleWorkspaces(
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "项目ID",
+            required = true
+        )
+        @QueryParam("projectId")
+        projectId: String,
+        @Parameter(
+            description = "工作空间名称列表",
+            required = true
+        )
+        workspaceNames: List<String>
+    ): Result<List<WeSecProjectWorkspace>>
+
+    @Operation(
+        summary = "按用户查询云桌面列表",
+        tags = ["v4_app_remotedev_user_workspaces_search"]
+    )
+    @POST
+    @Path("/user/workspaces/search")
+    fun searchUserWorkspaces(
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+       @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "第几页",
+            required = false,
+            example = "1"
+        )
+        @QueryParam("page")
+        page: Int?,
+        @Parameter(
+            description = "每页多少条",
+            required = false,
+            example = "100"
+        )
+        @QueryParam("pageSize")
+        pageSize: Int?,
+        @Parameter(
+            description = "搜索条件",
+            required = true
+        )
+        search: WorkspaceSearch
+    ): Result<Page<Workspace>>
+
+    @Operation(
+        summary = "分页批量获取THUMBNAIL的实例id列表",
+        tags = ["v4_app_remotedev_batch_query_thumbnail_workspaces"]
+    )
+    @GET
+    @Path("/batch_query_thumbnail_workspaces")
+    fun batchQueryThumbnailWorkspaces(
+        @Parameter(description = "appCode", required = true, example = AUTH_HEADER_DEVOPS_APP_CODE_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_DEVOPS_APP_CODE)
+        appCode: String?,
+        @Parameter(description = "apigw Type", required = true)
+        @PathParam("apigwType")
+        apigwType: String?,
+        @Parameter(description = "用户ID", required = true, example = AUTH_HEADER_USER_ID_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "ENABLE状态：true=开启THUMBNAIL，false=关闭THUMBNAIL",
+            required = true
+        )
+        @QueryParam("enable")
+        enable: Boolean,
+        @Parameter(description = "第几页（从1开始）", required = true, example = "1")
+        @QueryParam("page")
+        page: Int,
+        @Parameter(description = "每页多少条（最大1000）", required = true, example = "100")
+        @QueryParam("pageSize")
+        pageSize: Int
+    ): Result<Page<String>>
+
+    @Operation(
+        summary = "开启或关闭工作空间缩略图",
+        tags = ["v4_app_remotedev_enable_workspace_thumbnail"]
+    )
+    @POST
+    @Path("/enable_workspace_thumbnail")
+    fun enableWorkspaceThumbnail(
+        @Parameter(
+            description = "appCode",
+            required = true,
+            example = AUTH_HEADER_DEVOPS_APP_CODE_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_DEVOPS_APP_CODE)
+        appCode: String?,
+        @Parameter(description = "apigw Type", required = true)
+        @PathParam("apigwType")
+        apigwType: String?,
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(
+            description = "工作空间名称",
+            required = true
+        )
+        @QueryParam("workspaceName")
+        workspaceName: String,
+        @Parameter(
+            description = "是否启用：true=开启，false=关闭",
+            required = true
+        )
+        @QueryParam("enable")
+        enable: Boolean
+    ): Result<Boolean>
+
+    @Operation(summary = "获取指定工作空间详情", tags = ["v4_app_remotedev_start_cloud_workspace_detail"])
+    @GET
+    @Path("/start_cloud_workspace_detail")
+    fun startCloudWorkspaceDetail(
+        @Parameter(description = "appCode", required = true, example = AUTH_HEADER_DEVOPS_APP_CODE_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_DEVOPS_APP_CODE)
+        appCode: String?,
+        @Parameter(description = "apigw Type", required = true)
+        @PathParam("apigwType")
+        apigwType: String?,
+        @Parameter(description = "用户ID", required = true, example = AUTH_HEADER_USER_ID_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(description = "工作空间名称", required = true)
+        @QueryParam("workspaceName")
+        workspaceName: String?,
+        @Parameter(description = "环境id", required = true)
+        @QueryParam("envHashId")
+        envHashId: String?
+    ): Result<WorkspaceStartCloudDetail?>
 }

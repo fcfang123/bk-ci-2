@@ -59,7 +59,7 @@
             panels () {
                 return [
                     ...([TYPE_ENUM.atom, TYPE_ENUM.service].includes(this.type) ? [{ label: this.$t('store.概览'), name: 'statisticData' }] : []),
-                    ...(this.type !== TYPE_ENUM.image ? [{ label: this.$t('store.发布管理'), name: 'releaseManage' }] : []),
+                    { label: this.$t('store.发布管理'), name: 'releaseManage' },
                     ...(this.type === TYPE_ENUM.atom ? [{ label: this.$t('store.协作审批'), name: 'approval' }] : []),
                     ...(this.type !== TYPE_ENUM.template ? [{ label: this.$t('store.基本信息'), name: 'show' }] : []),
                     { label: this.$t('store.基本设置'), name: 'setting' }
@@ -125,12 +125,12 @@
             async requestDetail () {
                 const code = this.$route.params.code
                 const methodUrl = {
-                    atom: this.requestAtom,
-                    template: this.requestTemplateDetail,
-                    image: this.requestImageDetailByCode,
-                    service: this.requestServiceDetailByCode
+                    atom: () => this.requestAtom({atomCode: code,  serviceScope: 'PIPELINE'}),
+                    template: () => this.requestTemplateDetail(code),
+                    image: () => this.requestImageDetailByCode(code),
+                    service: () => this.requestServiceDetailByCode(code)
                 }
-                const res = await methodUrl[this.type](code)
+                const res = await methodUrl[this.type]()
                 
                 this.setDetail(res)
             },
