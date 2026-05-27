@@ -4,11 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.tencent.devops.common.api.exception.InvalidParamException
 import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.pipeline.pojo.atom.form.AtomForm
+import com.tencent.devops.common.redis.RedisOperation
 import com.tencent.devops.common.web.utils.I18nUtil
 import com.tencent.devops.store.atom.dao.AtomQueryParam
 import com.tencent.devops.store.atom.service.AtomService
 import com.tencent.devops.store.common.service.StoreComponentQueryService
+import com.tencent.devops.store.common.utils.StoreUtils
 import com.tencent.devops.store.pojo.atom.AtomCreateRequest
+import com.tencent.devops.store.pojo.atom.AtomGroupQueryParam
 import com.tencent.devops.store.pojo.atom.AtomResp
 import com.tencent.devops.store.pojo.atom.AtomRespItem
 import com.tencent.devops.store.pojo.atom.AtomUpgradeRequest
@@ -17,8 +20,8 @@ import com.tencent.devops.store.pojo.atom.enums.AtomCategoryEnum
 import com.tencent.devops.store.pojo.atom.enums.AtomTypeEnum
 import com.tencent.devops.store.pojo.atom.enums.JobTypeEnum
 import com.tencent.devops.store.pojo.common.BK_STORE_ALL_TRIGGER
+import com.tencent.devops.store.pojo.common.BK_STORE_COMMON_TRIGGER
 import com.tencent.devops.store.pojo.common.KEY_ATOM_FORM
-import com.tencent.devops.store.pojo.common.QueryGroupParam
 import com.tencent.devops.store.pojo.common.enums.ServiceScopeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreGroupByEnum
 import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
@@ -31,7 +34,8 @@ import org.springframework.stereotype.Service
 @Service
 class TriggerEventService @Autowired constructor(
     private val storeComponentQueryService: StoreComponentQueryService,
-    private val atomService: AtomService
+    private val atomService: AtomService,
+    private val redisOperation: RedisOperation
 ) {
     fun previewEvent(userId: String, storeId: String): AtomForm? {
         val detailInfo = storeComponentQueryService.getComponentDetailInfoById(
@@ -47,11 +51,12 @@ class TriggerEventService @Autowired constructor(
 
     fun listOwnerStoreCodes(userId: String): List<TriggerGroupInfo> {
         // 按照归属应用分组
-        val componentGroupCount = storeComponentQueryService.getComponentGroupCount(
+        val componentGroupCount = atomService.getAtomGroupCount(
             userId = userId,
-            queryGroupParam = QueryGroupParam(
-                storeType = StoreTypeEnum.TRIGGER_EVENT,
-                groupBy = StoreGroupByEnum.OWNER_STORE_CODE
+            atomGroupQueryParam = AtomGroupQueryParam(
+                groupBy = StoreGroupByEnum.OWNER_STORE_CODE,
+                category = AtomCategoryEnum.TRIGGER,
+                serviceScope = ServiceScopeEnum.CREATIVE_STREAM
             )
         )
         // 触发事件总数
@@ -97,13 +102,13 @@ class TriggerEventService @Autowired constructor(
                 queryProjectAtomFlag = false,
                 projectCode = null,
                 category = AtomCategoryEnum.TRIGGER.name,
-                serviceScope = null,
+                serviceScope = ServiceScopeEnum.CREATIVE_STREAM,
                 fitOsFlag = null,
                 jobType = null,
                 os = null,
                 queryFitAgentBuildLessAtomFlag = null,
                 recommendFlag = null,
-                ownerStoreCode = ownerStoreCode
+                ownerStoreCode = ownerStoreCode.takeIf { !it.isNullOrBlank() && it != BK_STORE_ALL_TRIGGER }
             ),
             page = page,
             pageSize = pageSize
@@ -164,14 +169,17 @@ class TriggerEventService @Autowired constructor(
                         logger.info("storeCode[${component.storeCode}|${component.version}] not found")
                         return@versionForeach
                     }
-                    val atomForm = detailInfo.extData?.get(KEY_ATOM_FORM)?.toString()
-                    if (!atomForm.isNullOrBlank()) {
+                    val atomForm = detailInfo.extData?.get(KEY_ATOM_FORM)?.let {
+                        JsonUtil.toJson(it, false)
+                    }
+                    if (atomForm.isNullOrBlank()) {
                         logger.info("storeCode[${component.storeCode}|${component.version}] not found atomForm")
                         return@versionForeach
                     }
                     // 如果存在则升级，否则创建
-                    val upgradeAtom = atomService.exists(component.storeCode).data ?: false
-                    if (upgradeAtom) {
+                    val upgradeAtom = (atomService.exists(component.storeCode).data ?: false) ||
+                            component.ownerStoreCode == BK_STORE_COMMON_TRIGGER
+                    val result = if (upgradeAtom) {
                         atomService.upgradeAtom(
                             userId = userId,
                             atomRequest = AtomUpgradeRequest(
@@ -191,7 +199,8 @@ class TriggerEventService @Autowired constructor(
                                 weight = null,
                                 data = null,
                                 version = component.version,
-                                ownerStoreCode = component.ownerStoreCode
+                                ownerStoreCode = component.ownerStoreCode,
+                                logoUrl = component.logoUrl
                             )
                         )
                     } else {
@@ -213,15 +222,19 @@ class TriggerEventService @Autowired constructor(
                                 props = atomForm,
                                 weight = null,
                                 data = null,
-                                ownerStoreCode = component.ownerStoreCode
+                                ownerStoreCode = component.ownerStoreCode,
+                                logoUrl = component.logoUrl
                             )
                         )
                     }
+                    logger.info("transfer atom[${component.storeCode}|${component.version}] result: $result")
                 } catch (ignored: Exception) {
                     logger.warn("fail to transfer atom[${component.storeCode}|${component.version}]", ignored)
                 }
             }
         }
+        // 触发器资源设置为默认插件后，需要删除公共插件标记，后续会自动重建
+        redisOperation.delete(StoreUtils.getStorePublicFlagKey(StoreTypeEnum.ATOM.name))
     }
 
     companion object {
