@@ -502,9 +502,7 @@ class DevxReleaseSpecBusServiceImpl @Autowired constructor(
         storeCode: String,
         storeType: StoreTypeEnum,
         storeUpdateRequest: StoreUpdateRequest
-    ) {
-        log.info("doStoreUpdatePostBus")
-    }
+    ) = Unit
 
     private fun processScriptContent(script: String, startParamMap: MutableMap<String, String>) {
         if (JsonSchemaUtil.validateJson(script)) {
