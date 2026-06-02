@@ -6,6 +6,7 @@ import com.tencent.devops.ai.external.ExternalAgentEvent
 import com.tencent.devops.ai.external.ExternalAgentGateway
 import com.tencent.devops.ai.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.external.ExternalAgentInput
+import com.tencent.devops.ai.service.ExternalAgentService
 import com.tencent.devops.common.api.util.JsonUtil
 import io.agentscope.core.agui.event.AguiEvent
 import io.agentscope.core.tool.Tool
@@ -15,6 +16,7 @@ import reactor.core.publisher.Flux
 import java.util.function.Supplier
 
 class ExternalAgentSupervisorTools(
+    private val externalAgentService: ExternalAgentService,
     private val gateway: ExternalAgentGateway,
     private val sessionContext: AgentSessionContext,
     private val userIdSupplier: Supplier<String>,
@@ -27,7 +29,7 @@ class ExternalAgentSupervisorTools(
             "或问题需要委派给某个外部智能体处理时使用。"
     )
     fun callExternalAgent(
-        @ToolParam(name = "config_id", description = "外部智能体配置 ID")
+        @ToolParam(name = "config_id", description = "外部智能体配置 ID 或显示名称")
         configId: String,
         @ToolParam(name = "query", description = "需要交给外部智能体处理的问题")
         query: String,
@@ -35,15 +37,17 @@ class ExternalAgentSupervisorTools(
         conversationId: String? = null
     ): String {
         val userId = userIdSupplier.get()
+        var resolvedConfigId = configId
         val content = StringBuilder()
         var externalConversationId: String? = conversationId?.takeIf { it.isNotBlank() }
         var errorCategory: ExternalAgentErrorCategory? = null
         var errorMessage: String? = null
 
         return try {
+            resolvedConfigId = externalAgentService.resolveEnabledConfigId(userId, configId)
             gateway.stream(
                 userId = userId,
-                configId = configId,
+                configId = resolvedConfigId,
                 input = ExternalAgentInput(
                     query = query,
                     conversationId = conversationId.orEmpty(),
@@ -53,21 +57,21 @@ class ExternalAgentSupervisorTools(
                 when (event) {
                     is ExternalAgentEvent.TextDelta -> {
                         content.append(event.delta)
-                        emitProgress(configId, "text_delta", event.delta, externalConversationId)
+                        emitProgress(resolvedConfigId, "text_delta", event.delta, externalConversationId)
                     }
                     is ExternalAgentEvent.ConversationId -> {
                         externalConversationId = event.conversationId
-                        emitProgress(configId, "conversation_id", null, externalConversationId)
+                        emitProgress(resolvedConfigId, "conversation_id", null, externalConversationId)
                     }
                     is ExternalAgentEvent.Custom -> {
-                        emitProgress(configId, event.eventType, null, externalConversationId)
+                        emitProgress(resolvedConfigId, event.eventType, null, externalConversationId)
                     }
                     is ExternalAgentEvent.Error -> {
                         errorCategory = event.category
                         errorMessage = event.message
-                        emitProgress(configId, "error", event.message, externalConversationId)
+                        emitProgress(resolvedConfigId, "error", event.message, externalConversationId)
                     }
-                    ExternalAgentEvent.Done -> emitProgress(configId, "done", null, externalConversationId)
+                    ExternalAgentEvent.Done -> emitProgress(resolvedConfigId, "done", null, externalConversationId)
                 }
             }.onErrorResume { error ->
                 val gatewayError = error as? ExternalAgentGatewayException
@@ -89,7 +93,7 @@ class ExternalAgentSupervisorTools(
             logger.warn(
                 "[ExternalAgentSupervisorTool] call failed: userId={}, configId={}, threadId={}, error={}",
                 userId,
-                configId,
+                resolvedConfigId,
                 threadId,
                 e.message
             )

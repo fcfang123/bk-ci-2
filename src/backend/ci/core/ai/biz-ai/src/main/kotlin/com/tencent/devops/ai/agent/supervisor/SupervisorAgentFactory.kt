@@ -160,6 +160,7 @@ class SupervisorAgentFactory(
             externalAgentGatewayProperties.supervisorToolEnabled) {
             toolkit.registerTool(
                 ExternalAgentSupervisorTools(
+                    externalAgentService = externalAgentService,
                     gateway = externalAgentGateway,
                     sessionContext = sessionContext,
                     userIdSupplier = { userId },

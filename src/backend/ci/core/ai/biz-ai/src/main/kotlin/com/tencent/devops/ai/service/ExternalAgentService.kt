@@ -121,6 +121,40 @@ class ExternalAgentService @Autowired constructor(
         return toInfo(record, maskHeaders = false)
     }
 
+    fun resolveEnabledConfigId(
+        userId: String,
+        configIdOrName: String
+    ): String {
+        val normalized = configIdOrName.trim()
+        val enabledConfigs = listEnabled(userId)
+        enabledConfigs.firstOrNull { it.id == normalized }?.let { return it.id }
+
+        val exactNameMatches = enabledConfigs.filter { it.agentName == normalized }
+        if (exactNameMatches.size == 1) {
+            return exactNameMatches.single().id
+        }
+        if (exactNameMatches.size > 1) {
+            throw invalidConfig("存在多个同名外部智能体，请改用配置 ID 调用")
+        }
+
+        val ignoreCaseNameMatches = enabledConfigs.filter {
+            it.agentName.equals(normalized, ignoreCase = true)
+        }
+        if (ignoreCaseNameMatches.size == 1) {
+            return ignoreCaseNameMatches.single().id
+        }
+        if (ignoreCaseNameMatches.size > 1) {
+            throw invalidConfig("存在多个名称近似的外部智能体，请改用配置 ID 调用")
+        }
+
+        throw ErrorCodeException(
+            statusCode = 404,
+            errorCode = AiMessageCode.EXTERNAL_AGENT_NOT_FOUND,
+            defaultMessage = "External agent config not found",
+            params = arrayOf(configIdOrName)
+        )
+    }
+
     fun update(
         userId: String,
         configId: String,
