@@ -3,9 +3,12 @@ package com.tencent.devops.ai.config
 import com.tencent.devops.ai.agent.SubAgentDefinition
 import com.tencent.devops.ai.agent.SubAgentFactory
 import com.tencent.devops.ai.agent.supervisor.SupervisorAgentFactory
+import com.tencent.devops.ai.external.ExternalAgentGateway
+import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.AgentSysPromptService
 import com.tencent.devops.ai.service.AiModelResolver
 import com.tencent.devops.ai.context.AgentSessionContext
+import com.tencent.devops.ai.service.ExternalAgentService
 import com.tencent.devops.common.client.Client
 import io.agentscope.core.ReActAgent
 import io.agentscope.core.memory.autocontext.AutoContextConfig
@@ -26,6 +29,9 @@ class AiSupervisorConfig {
         sysPromptService: AgentSysPromptService,
         subAgentFactory: SubAgentFactory,
         subAgentDefinitions: List<SubAgentDefinition>,
+        externalAgentService: ExternalAgentService,
+        externalAgentGateway: ExternalAgentGateway,
+        externalAgentGatewayProperties: ExternalAgentGatewayProperties,
         client: Client
     ): Supplier<ReActAgent> {
         val factory = SupervisorAgentFactory(
@@ -35,6 +41,9 @@ class AiSupervisorConfig {
             sysPromptService = sysPromptService,
             subAgentFactory = subAgentFactory,
             subAgents = subAgentDefinitions,
+            externalAgentService = externalAgentService,
+            externalAgentGateway = externalAgentGateway,
+            externalAgentGatewayProperties = externalAgentGatewayProperties,
             client = client
         )
 

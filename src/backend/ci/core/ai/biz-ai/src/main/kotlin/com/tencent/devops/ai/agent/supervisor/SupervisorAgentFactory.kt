@@ -28,14 +28,19 @@
 package com.tencent.devops.ai.agent.supervisor
 
 import com.tencent.devops.ai.agent.CommonTools
+import com.tencent.devops.ai.agent.ExternalAgentSupervisorTools
 import com.tencent.devops.ai.agent.SubAgentDefinition
 import com.tencent.devops.ai.agent.SubAgentFactory
 import com.tencent.devops.ai.context.AgentSessionContext
 import com.tencent.devops.ai.context.AiChatContext
 import com.tencent.devops.ai.context.ContextMarker
+import com.tencent.devops.ai.external.ExternalAgentGateway
 import com.tencent.devops.ai.pojo.ChatContextDTO
+import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.AgentSysPromptService
 import com.tencent.devops.ai.service.AiModelResolver
+import com.tencent.devops.ai.service.ExternalAgentService
 import com.tencent.devops.common.client.Client
 import io.agentscope.core.ReActAgent
 import io.agentscope.core.agent.EventType
@@ -60,6 +65,9 @@ class SupervisorAgentFactory(
     private val sysPromptService: AgentSysPromptService,
     private val subAgentFactory: SubAgentFactory,
     private val subAgents: List<SubAgentDefinition>,
+    private val externalAgentService: ExternalAgentService,
+    private val externalAgentGateway: ExternalAgentGateway,
+    private val externalAgentGatewayProperties: ExternalAgentGatewayProperties,
     private val client: Client
 ) {
 
@@ -76,7 +84,8 @@ class SupervisorAgentFactory(
         val model = resolvedModel.model
         val chatContext = AiChatContext.getContext()
         val boundAgents = subAgents.filter { it.bindToSupervisor() }
-        val variables = buildVariables(userId, chatContext, boundAgents)
+        val externalAgents = loadEnabledExternalAgents(userId)
+        val variables = buildVariables(userId, chatContext, boundAgents, externalAgents)
         val sysPrompt = sysPromptService.buildSysPrompt(
             agentName = SUPERVISOR_BIND_KEY,
             defaultPrompt = DEFAULT_SUPERVISOR_PROMPT,
@@ -147,6 +156,17 @@ class SupervisorAgentFactory(
         toolkit.registerTool(CommonTools(client) { userId })
 
         val capturedThreadId = AiChatContext.getThreadId()
+        if (externalAgentGatewayProperties.enabled &&
+            externalAgentGatewayProperties.supervisorToolEnabled) {
+            toolkit.registerTool(
+                ExternalAgentSupervisorTools(
+                    gateway = externalAgentGateway,
+                    sessionContext = sessionContext,
+                    userIdSupplier = { userId },
+                    threadId = capturedThreadId
+                )
+            )
+        }
         boundAgents.forEach { definition ->
             val subAgentConfig = SubAgentConfig.builder()
                 .toolName(definition.toolName())
@@ -202,7 +222,8 @@ class SupervisorAgentFactory(
     private fun buildVariables(
         userId: String,
         context: ChatContextDTO,
-        boundAgents: List<SubAgentDefinition>
+        boundAgents: List<SubAgentDefinition>,
+        externalAgents: List<ExternalAgentInfo>
     ): Map<String, String> {
         val vars = mutableMapOf<String, String>()
         vars["user_id"] = userId
@@ -213,6 +234,7 @@ class SupervisorAgentFactory(
                 "- ${agent.toolName()}: ${agent.description()}"
             }
         }
+        vars["external_agent_list"] = buildExternalAgentList(externalAgents)
         vars["context_block"] = buildContextBlock(
             userId, context.rawPairs
         )
@@ -220,6 +242,38 @@ class SupervisorAgentFactory(
             vars[key] = value
         }
         return vars
+    }
+
+    private fun loadEnabledExternalAgents(userId: String): List<ExternalAgentInfo> {
+        if (!externalAgentGatewayProperties.enabled || !externalAgentGatewayProperties.supervisorToolEnabled) {
+            return emptyList()
+        }
+        return try {
+            externalAgentService.listEnabled(userId)
+        } catch (e: Exception) {
+            logger.warn(
+                "[Supervisor] Load external agents failed: userId={}, error={}",
+                userId,
+                e.message
+            )
+            emptyList()
+        }
+    }
+
+    private fun buildExternalAgentList(externalAgents: List<ExternalAgentInfo>): String {
+        if (externalAgents.isEmpty()) {
+            return "当前用户没有已启用外部智能体配置。"
+        }
+        return buildString {
+            appendLine("可通过工具 call_external_agent 调用以下用户已启用外部智能体：")
+            externalAgents.forEach { agent ->
+                appendLine(
+                    "- ${agent.agentName}: config_id=${agent.id}, platform=${agent.platform}, " +
+                        "description=${agent.description}"
+                )
+            }
+            appendLine("当用户在普通消息中使用 @外部智能体名称 或 @config_id 时，优先调用匹配配置。")
+        }.trimEnd()
     }
 
     private fun buildContextBlock(
@@ -283,12 +337,16 @@ class SupervisorAgentFactory(
         |二、专家子智能体（工具名以 call_ 开头）
         |{{agent_list}}
         |
+        |三、外部智能体轻量工具
+        |{{external_agent_list}}
+        |
         |决策原则：
         |1. 收到问题后，优先用 iWiki 搜索相关文档
         |2. 搜到有用内容则直接回答，注明文档来源
-        |3. 搜不到或需要执行操作（如加权限、触发构建）时，转给对应的子智能体处理
-        |4. 通用常识问题无需搜索，直接回答
-        |5. 始终用中文回复
+        |3. 用户 @ 外部智能体或问题明显需要外部智能体能力时，使用 call_external_agent，并将工具返回内容整合进最终回复
+        |4. 搜不到或需要执行操作（如加权限、触发构建）时，转给对应的子智能体处理
+        |5. 通用常识问题无需搜索，直接回答
+        |6. 始终用中文回复
         """.trimMargin()
     }
 }

@@ -35,7 +35,7 @@ data class ExternalAgentCreate(
     val agentName: String,
     @get:Schema(title = "能力描述", required = true, example = "审查代码变更，发现潜在问题")
     val description: String,
-    @get:Schema(title = "平台类型：KNOT / BKAIDEV", required = true, example = "KNOT")
+    @get:Schema(title = "平台类型", required = true)
     val platform: String,
     @get:Schema(title = "平台上的Agent ID", required = true)
     val agentId: String,
@@ -43,8 +43,7 @@ data class ExternalAgentCreate(
     val apiUrl: String,
     @get:Schema(
         title = "认证头JSON",
-        required = false,
-        example = """{"x-knot-api-token":"xxx"}"""
+        required = false
     )
     val headers: String? = null,
     @get:Schema(title = "是否启用", required = false)

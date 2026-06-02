@@ -35,7 +35,7 @@ data class ExternalAgentUpdate(
     val agentName: String? = null,
     @get:Schema(title = "能力描述", required = false)
     val description: String? = null,
-    @get:Schema(title = "平台类型：KNOT / BKAIDEV", required = false)
+    @get:Schema(title = "平台类型", required = false)
     val platform: String? = null,
     @get:Schema(title = "平台上的Agent ID", required = false)
     val agentId: String? = null,

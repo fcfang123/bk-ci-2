@@ -29,10 +29,14 @@ package com.tencent.devops.ai.service
 
 import com.tencent.devops.ai.constant.AiMessageCode
 import com.tencent.devops.ai.dao.ExternalAgentConfigDao
+import com.tencent.devops.ai.external.ExternalAgentAdapter
+import com.tencent.devops.ai.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.exception.ErrorCodeException
+import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.api.util.UUIDUtil
 import com.tencent.devops.model.ai.tables.records.TAiExternalAgentConfigRecord
 import org.jooq.DSLContext
@@ -47,14 +51,23 @@ import java.time.ZoneOffset
 @Service
 class ExternalAgentService @Autowired constructor(
     private val dslContext: DSLContext,
-    private val dao: ExternalAgentConfigDao
+    private val dao: ExternalAgentConfigDao,
+    adapters: List<ExternalAgentAdapter> = emptyList()
 ) {
+
+    private val adapterMap = adapters.associateBy { it.platform().uppercase() }
 
     fun create(
         userId: String,
         request: ExternalAgentCreate
     ): ExternalAgentInfo {
         val id = UUIDUtil.generate()
+        validateConfig(
+            platform = request.platform,
+            agentId = request.agentId,
+            apiUrl = request.apiUrl,
+            headers = request.headers
+        )
         logger.info(
             "[ExternalAgent] Creating: id={}, userId={}, " +
                 "name={}, platform={}",
@@ -78,18 +91,34 @@ class ExternalAgentService @Autowired constructor(
                 defaultMessage =
                     "Failed to create external agent config"
             )
-        return toInfo(record)
+        return toInfo(record, maskHeaders = true)
     }
 
     fun list(userId: String): List<ExternalAgentInfo> {
         return dao.listByUser(dslContext, userId)
-            .map { toInfo(it) }
+            .map { toInfo(it, maskHeaders = true) }
     }
 
     fun listEnabled(userId: String?): List<ExternalAgentInfo> {
         if (userId.isNullOrBlank()) return emptyList()
         return dao.listEnabledByUser(dslContext, userId)
-            .map { toInfo(it) }
+            .map { toInfo(it, maskHeaders = false) }
+    }
+
+    fun getEnabled(
+        userId: String,
+        configId: String
+    ): ExternalAgentInfo {
+        val record = getOwnedRecord(userId, configId)
+        if (!record.enabled) {
+            throw ErrorCodeException(
+                statusCode = 403,
+                errorCode = AiMessageCode.EXTERNAL_AGENT_NO_PERMISSION,
+                defaultMessage = "External agent config is disabled",
+                params = arrayOf(configId)
+            )
+        }
+        return toInfo(record, maskHeaders = false)
     }
 
     fun update(
@@ -101,7 +130,13 @@ class ExternalAgentService @Autowired constructor(
             "[ExternalAgent] Updating: userId={}, configId={}",
             userId, configId
         )
-        checkOwnership(userId, configId)
+        val record = getOwnedRecord(userId, configId)
+        validateConfig(
+            platform = request.platform ?: record.platform,
+            agentId = request.agentId ?: record.agentId,
+            apiUrl = request.apiUrl ?: record.apiUrl,
+            headers = request.headers ?: record.headers
+        )
         return dao.update(
             dslContext = dslContext,
             id = configId,
@@ -125,6 +160,46 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun checkOwnership(userId: String, configId: String) {
+        getOwnedRecord(userId, configId)
+    }
+
+    private fun validateConfig(
+        platform: String,
+        agentId: String,
+        apiUrl: String,
+        headers: String?
+    ) {
+        val adapter = adapterMap[platform.uppercase()]
+            ?: throw invalidConfig("暂不支持该外部智能体平台")
+        if (agentId.isBlank()) {
+            throw invalidConfig("外部智能体 agentId 不能为空")
+        }
+        try {
+            adapter.validateConfig(
+                ExternalAgentConfigValidationContext(
+                    platform = platform,
+                    agentId = agentId,
+                    apiUrl = apiUrl,
+                    headers = headers
+                )
+            )
+        } catch (e: ExternalAgentGatewayException) {
+            throw invalidConfig(e.message)
+        }
+    }
+
+    private fun invalidConfig(message: String?): ErrorCodeException {
+        return ErrorCodeException(
+            statusCode = 400,
+            errorCode = AiMessageCode.EXTERNAL_AGENT_CONFIG_INVALID,
+            defaultMessage = message ?: "External agent config is invalid"
+        )
+    }
+
+    private fun getOwnedRecord(
+        userId: String,
+        configId: String
+    ): TAiExternalAgentConfigRecord {
         val record = dao.getById(dslContext, configId)
             ?: throw ErrorCodeException(
                 statusCode = 404,
@@ -141,16 +216,12 @@ class ExternalAgentService @Autowired constructor(
                 params = arrayOf(configId)
             )
         }
-    }
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(
-            ExternalAgentService::class.java
-        )
+        return record
     }
 
     private fun toInfo(
-        record: TAiExternalAgentConfigRecord
+        record: TAiExternalAgentConfigRecord,
+        maskHeaders: Boolean
     ): ExternalAgentInfo {
         return ExternalAgentInfo(
             id = record.id,
@@ -160,12 +231,27 @@ class ExternalAgentService @Autowired constructor(
             platform = record.platform,
             agentId = record.agentId,
             apiUrl = record.apiUrl,
-            headers = record.headers,
+            headers = if (maskHeaders) maskHeaders(record.headers) else record.headers,
             enabled = record.enabled,
             createdTime = record.createdTime
                 .toInstant(ZoneOffset.ofHours(8)).toEpochMilli(),
             updatedTime = record.updatedTime
                 .toInstant(ZoneOffset.ofHours(8)).toEpochMilli()
+        )
+    }
+
+    private fun maskHeaders(headers: String?): String? {
+        val parsedHeaders = AiMcpServerService.parseHeaders(headers)
+        if (parsedHeaders.isEmpty()) {
+            return null
+        }
+        return JsonUtil.toJson(parsedHeaders.mapValues { MASKED_HEADER_VALUE })
+    }
+
+    companion object {
+        private const val MASKED_HEADER_VALUE = "******"
+        private val logger = LoggerFactory.getLogger(
+            ExternalAgentService::class.java
         )
     }
 }

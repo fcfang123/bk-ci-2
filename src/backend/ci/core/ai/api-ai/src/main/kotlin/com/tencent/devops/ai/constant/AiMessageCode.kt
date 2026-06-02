@@ -56,6 +56,7 @@ object AiMessageCode {
     const val CREATE_EXTERNAL_AGENT_FAILED = "2133041"
     const val EXTERNAL_AGENT_NOT_FOUND = "2133042"
     const val EXTERNAL_AGENT_NO_PERMISSION = "2133043"
+    const val EXTERNAL_AGENT_CONFIG_INVALID = "2133044"
 
     // ── MCP 服务相关 (051-060) ──
     const val CREATE_MCP_SERVER_FAILED = "2133051"
