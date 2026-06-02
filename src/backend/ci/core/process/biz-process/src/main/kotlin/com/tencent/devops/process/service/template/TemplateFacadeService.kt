@@ -381,8 +381,14 @@ class TemplateFacadeService @Autowired constructor(
             statusCode = Response.Status.NOT_FOUND.statusCode,
             errorCode = ProcessMessageCode.ERROR_PIPELINE_MODEL_NOT_EXISTS
         )
-        val templateModel: Model = PipelineUtils.fixedTemplateParam(objectMapper.readValue(template))
-        templateModel.name = saveAsTemplateReq.templateName
+        val templateModel: Model = PipelineUtils.fixedTemplateParam(objectMapper.readValue(template)).copy(
+            name = saveAsTemplateReq.templateName,
+            instanceFromTemplate = false,
+            template = null,
+            templateId = null,
+            overrideTemplateField = null,
+            srcTemplateId = null
+        )
         checkTemplateAtomsForExplicitVersion(templateModel, userId)
         val templateId = UUIDUtil.generate()
         val templateVersion = client.get(ServiceAllocIdResource::class).generateSegmentId(TEMPLATE_BIZ_TAG_NAME).data
