@@ -37,6 +37,7 @@ import com.tencent.devops.ai.context.ContextMarker
 import com.tencent.devops.ai.external.ExternalAgentGateway
 import com.tencent.devops.ai.pojo.ChatContextDTO
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.properties.AiSupervisorProperties
 import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.AgentSysPromptService
 import com.tencent.devops.ai.service.AiModelResolver
@@ -47,10 +48,13 @@ import io.agentscope.core.agent.EventType
 import io.agentscope.core.agent.StreamOptions
 import io.agentscope.core.memory.autocontext.AutoContextConfig
 import io.agentscope.core.memory.autocontext.AutoContextMemory
+import io.agentscope.core.model.ExecutionConfig
 import io.agentscope.core.model.Model
 import io.agentscope.core.tool.Toolkit
+import io.agentscope.core.tool.ToolkitConfig
 import io.agentscope.core.tool.subagent.SubAgentConfig
 import org.slf4j.LoggerFactory
+import java.time.Duration
 
 /**
  * Supervisor 智能体工厂，负责创建主控智能体实例。
@@ -67,6 +71,7 @@ class SupervisorAgentFactory(
     private val subAgents: List<SubAgentDefinition>,
     private val externalAgentService: ExternalAgentService,
     private val externalAgentGateway: ExternalAgentGateway,
+    private val aiSupervisorProperties: AiSupervisorProperties,
     private val externalAgentGatewayProperties: ExternalAgentGatewayProperties,
     private val client: Client
 ) {
@@ -150,8 +155,15 @@ class SupervisorAgentFactory(
         boundAgents: List<SubAgentDefinition>,
         model: Model
     ): Toolkit {
-        val toolkit = subAgentFactory.loadMcpClients(
-            userId, SUPERVISOR_BIND_KEY
+        val toolkitConfigBuilder = ToolkitConfig.builder().parallel(true)
+        buildSupervisorToolkitExecutionConfig()?.let { toolkitConfig ->
+            toolkitConfigBuilder.executionConfig(toolkitConfig)
+        }
+        val toolkit = Toolkit(toolkitConfigBuilder.build())
+        subAgentFactory.populateMcpClients(
+            toolkit = toolkit,
+            userId = userId,
+            bindAgent = SUPERVISOR_BIND_KEY
         )
         toolkit.registerTool(CommonTools(client) { userId })
 
@@ -215,6 +227,23 @@ class SupervisorAgentFactory(
             ).apply()
         }
         return toolkit
+    }
+
+    private fun buildSupervisorToolkitExecutionConfig(): ExecutionConfig? {
+        val timeoutSeconds = aiSupervisorProperties.toolkitTimeoutSeconds
+        if (timeoutSeconds <= 0) {
+            logger.info(
+                "[Supervisor] Toolkit tool timeout override disabled, falling back to AgentScope defaults"
+            )
+            return null
+        }
+        logger.info(
+            "[Supervisor] Toolkit tool timeout override enabled: timeout={}s",
+            timeoutSeconds
+        )
+        return ExecutionConfig.builder()
+            .timeout(Duration.ofSeconds(timeoutSeconds))
+            .build()
     }
 
     /**
