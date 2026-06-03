@@ -67,6 +67,15 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
             .bodyValue(body)
             .retrieve()
             .bodyToFlux<String>()
+            .doOnNext { chunk ->
+                logger.info(
+                    "[ExternalAgentGateway] BkAiDev raw chunk: userId={}, configId={}, chars={}, shape={}",
+                    request.userId,
+                    config.id,
+                    chunk.length,
+                    ExternalAgentSseEventParser.describeChunk(chunk)
+                )
+            }
             .flatMapIterable { ExternalAgentSseEventParser.parseBkAiDev(it) }
             .doOnCancel {
                 logger.info(

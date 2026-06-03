@@ -80,6 +80,17 @@ class ExternalAgentSupervisorTools(
                 Flux.empty()
             }.blockLast()
 
+            if (errorCategory == null && content.isEmpty()) {
+                logger.warn(
+                    "[ExternalAgentSupervisorTool] call completed without text content: userId={}, " +
+                        "configId={}, threadId={}, conversationId={}",
+                    userId,
+                    resolvedConfigId,
+                    threadId,
+                    externalConversationId
+                )
+            }
+
             JsonUtil.toJson(
                 mapOf(
                     "success" to (errorCategory == null),

@@ -59,6 +59,15 @@ class KnotExternalAgentAdapter : ExternalAgentAdapter {
             .bodyValue(body)
             .retrieve()
             .bodyToFlux<String>()
+            .doOnNext { chunk ->
+                logger.info(
+                    "[ExternalAgentGateway] Knot raw chunk: userId={}, configId={}, chars={}, shape={}",
+                    request.userId,
+                    config.id,
+                    chunk.length,
+                    ExternalAgentSseEventParser.describeChunk(chunk)
+                )
+            }
             .flatMapIterable { ExternalAgentSseEventParser.parseKnot(it) }
             .doOnCancel {
                 logger.info(

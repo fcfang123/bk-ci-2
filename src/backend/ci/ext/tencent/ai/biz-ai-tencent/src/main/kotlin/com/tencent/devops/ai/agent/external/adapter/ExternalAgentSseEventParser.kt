@@ -26,7 +26,11 @@ object ExternalAgentSseEventParser {
                     }
                     "RUN_STARTED" -> {
                         val threadId = event["thread_id"]?.toString()
-                        listOfNotNull(threadId?.takeIf { it.isNotBlank() }?.let { ExternalAgentEvent.ConversationId(it) })
+                        listOfNotNull(
+                            threadId?.takeIf { it.isNotBlank() }?.let {
+                                ExternalAgentEvent.ConversationId(it)
+                            }
+                        )
                     }
                     "TEXT_MESSAGE_END", "RUN_FINISHED", "done" -> listOf(ExternalAgentEvent.Done)
                     "error", "RUN_ERROR" -> listOf(upstreamError(event["message"]?.toString()))
@@ -61,12 +65,36 @@ object ExternalAgentSseEventParser {
         }
     }
 
+    fun describeChunk(chunk: String): String {
+        val trimmed = chunk.trim()
+        return buildString {
+            append("lines=").append(chunk.lines().size)
+            append(",hasDataPrefix=").append(chunk.contains("data:"))
+            append(",startsWithBrace=").append(trimmed.startsWith("{"))
+            append(",startsWithBracket=").append(trimmed.startsWith("["))
+            append(",containsType=").append(chunk.contains("\"type\""))
+            append(",containsEvent=").append(chunk.contains("\"event\""))
+            append(",containsDelta=").append(chunk.contains("\"delta\""))
+            append(",containsRawEvent=").append(chunk.contains("\"rawEvent\""))
+            append(",containsConversationId=").append(
+                chunk.contains("conversation_id") || chunk.contains("thread_id")
+            )
+        }
+    }
+
     private fun parseDataLines(chunk: String): List<String> {
         return chunk.lines()
             .asSequence()
             .map { it.trim() }
-            .filter { it.startsWith("data:") }
-            .map { it.removePrefix("data:").trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.startsWith("event:") || it.startsWith("id:") || it.startsWith(":") }
+            .map { line ->
+                if (line.startsWith("data:")) {
+                    line.removePrefix("data:").trim()
+                } else {
+                    line
+                }
+            }
             .filter { it.isNotBlank() }
             .toList()
     }
@@ -79,7 +107,11 @@ object ExternalAgentSseEventParser {
             val event = objectMapper.readValue(data, MAP_TYPE)
             mapper(event)
         } catch (e: Exception) {
-            logger.warn("[ExternalAgentSse] Parse event failed: {}", e.message)
+            logger.warn(
+                "[ExternalAgentSse] Parse event failed: error={}, shape={}",
+                e.message,
+                describeChunk(data)
+            )
             listOf(
                 ExternalAgentEvent.Error(
                     message = "外部智能体事件解析失败",
