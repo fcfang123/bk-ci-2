@@ -38,6 +38,7 @@ class ExternalAgentSupervisorTools(
     ): String {
         val userId = userIdSupplier.get()
         var resolvedConfigId = configId
+        var agentDisplayName = configId
         val content = StringBuilder()
         var externalConversationId: String? = conversationId?.takeIf { it.isNotBlank() }
         var errorCategory: ExternalAgentErrorCategory? = null
@@ -45,6 +46,9 @@ class ExternalAgentSupervisorTools(
 
         return try {
             resolvedConfigId = externalAgentService.resolveEnabledConfigId(userId, configId)
+            agentDisplayName = externalAgentService.getEnabled(userId, resolvedConfigId).agentName
+                .takeIf { it.isNotBlank() }
+                ?: resolvedConfigId
             gateway.stream(
                 userId = userId,
                 configId = resolvedConfigId,
@@ -57,21 +61,46 @@ class ExternalAgentSupervisorTools(
                 when (event) {
                     is ExternalAgentEvent.TextDelta -> {
                         content.append(event.delta)
-                        emitProgress(resolvedConfigId, "text_delta", event.delta, externalConversationId)
+                        emitProgress(
+                            agentName = agentDisplayName,
+                            configId = resolvedConfigId,
+                            eventType = EVENT_TYPE_ASSISTANT,
+                            content = event.delta,
+                            conversationId = externalConversationId
+                        )
                     }
                     is ExternalAgentEvent.ConversationId -> {
                         externalConversationId = event.conversationId
-                        emitProgress(resolvedConfigId, "conversation_id", null, externalConversationId)
                     }
                     is ExternalAgentEvent.Custom -> {
-                        emitProgress(resolvedConfigId, event.eventType, null, externalConversationId)
+                        emitCustomProgress(
+                            agentName = agentDisplayName,
+                            configId = resolvedConfigId,
+                            event = event,
+                            conversationId = externalConversationId
+                        )
                     }
                     is ExternalAgentEvent.Error -> {
                         errorCategory = event.category
                         errorMessage = event.message
-                        emitProgress(resolvedConfigId, "error", event.message, externalConversationId)
+                        emitProgress(
+                            agentName = agentDisplayName,
+                            configId = resolvedConfigId,
+                            eventType = EVENT_TYPE_ASSISTANT,
+                            content = event.message,
+                            conversationId = externalConversationId,
+                            isLast = true,
+                            extraData = mapOf("errorCategory" to event.category.name)
+                        )
                     }
-                    ExternalAgentEvent.Done -> emitProgress(resolvedConfigId, "done", null, externalConversationId)
+                    ExternalAgentEvent.Done -> emitProgress(
+                        agentName = agentDisplayName,
+                        configId = resolvedConfigId,
+                        eventType = EVENT_TYPE_ASSISTANT,
+                        content = null,
+                        conversationId = externalConversationId,
+                        isLast = true
+                    )
                 }
             }.onErrorResume { error ->
                 val gatewayError = error as? ExternalAgentGatewayException
@@ -121,19 +150,27 @@ class ExternalAgentSupervisorTools(
     }
 
     private fun emitProgress(
+        agentName: String,
         configId: String,
         eventType: String,
         content: String?,
-        conversationId: String?
+        conversationId: String?,
+        isLast: Boolean = false,
+        extraData: Map<String, Any?> = emptyMap()
     ) {
+        if (!isLast && content.isNullOrBlank()) {
+            return
+        }
         val sinkInfo = threadId?.let { sessionContext.getSinkByThreadId(it) } ?: return
         val data = mutableMapOf<String, Any?>(
-            "agentName" to TOOL_NAME,
+            "agentName" to agentName,
             "configId" to configId,
             "eventType" to eventType,
-            "conversationId" to conversationId
+            "conversationId" to conversationId,
+            "isLast" to isLast
         )
         content?.take(MAX_CONTENT)?.let { data["content"] = it }
+        data.putAll(extraData)
         sinkInfo.sink.tryEmitNext(
             AguiEvent.Custom(
                 sinkInfo.threadId,
@@ -144,10 +181,45 @@ class ExternalAgentSupervisorTools(
         )
     }
 
+    private fun emitCustomProgress(
+        agentName: String,
+        configId: String,
+        event: ExternalAgentEvent.Custom,
+        conversationId: String?
+    ) {
+        val mappedEventType = if (event.eventType.contains(REASONING_KEYWORD, ignoreCase = true)) {
+            EVENT_TYPE_REASONING
+        } else {
+            EVENT_TYPE_ASSISTANT
+        }
+        val content = extractCustomContent(event.data)
+        emitProgress(
+            agentName = agentName,
+            configId = configId,
+            eventType = mappedEventType,
+            content = content,
+            conversationId = conversationId,
+            extraData = mapOf("externalEventType" to event.eventType)
+        )
+    }
+
+    private fun extractCustomContent(data: Map<String, Any?>): String? {
+        val rawEvent = data["rawEvent"] as? Map<*, *>
+        return listOf(
+            data["delta"]?.toString(),
+            data["content"]?.toString(),
+            data["text"]?.toString(),
+            rawEvent?.get("content")?.toString(),
+            rawEvent?.get("text")?.toString()
+        ).firstOrNull { !it.isNullOrBlank() }?.take(MAX_CONTENT)
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger(ExternalAgentSupervisorTools::class.java)
-        private const val TOOL_NAME = "call_external_agent"
-        private const val CUSTOM_EVENT_NAME = "external_agent_event"
+        private const val CUSTOM_EVENT_NAME = "subagent_event"
+        private const val EVENT_TYPE_ASSISTANT = "ASSISTANT"
+        private const val EVENT_TYPE_REASONING = "REASONING"
         private const val MAX_CONTENT = 2000
+        private const val REASONING_KEYWORD = "REASON"
     }
 }

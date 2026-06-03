@@ -4,12 +4,18 @@ import com.tencent.devops.ai.context.AgentSessionContext
 import com.tencent.devops.ai.external.ExternalAgentEvent
 import com.tencent.devops.ai.external.ExternalAgentGateway
 import com.tencent.devops.ai.external.ExternalAgentInput
+import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.service.ExternalAgentService
+import io.agentscope.core.agent.Agent
+import io.agentscope.core.agui.event.AguiEvent
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 class ExternalAgentSupervisorToolsTest {
 
@@ -21,6 +27,9 @@ class ExternalAgentSupervisorToolsTest {
         every {
             externalAgentService.resolveEnabledConfigId(USER_ID, CONFIG_ID)
         } returns CONFIG_ID
+        every {
+            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
+        } returns enabledAgentInfo()
         every {
             gateway.stream(
                 userId = USER_ID,
@@ -58,6 +67,9 @@ class ExternalAgentSupervisorToolsTest {
             externalAgentService.resolveEnabledConfigId(USER_ID, AGENT_NAME)
         } returns CONFIG_ID
         every {
+            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
+        } returns enabledAgentInfo()
+        every {
             gateway.stream(
                 userId = USER_ID,
                 configId = CONFIG_ID,
@@ -78,6 +90,66 @@ class ExternalAgentSupervisorToolsTest {
         )
 
         assertTrue(result.contains("ok"))
+    }
+
+    @Test
+    fun `callExternalAgent should emit subagent style progress events`() {
+        val sessionContext = AgentSessionContext()
+        val sink = Sinks.many().multicast().onBackpressureBuffer<AguiEvent>()
+        val emittedEvents = mutableListOf<AguiEvent>()
+        sink.asFlux().subscribe { emittedEvents.add(it) }
+        sessionContext.registerSink(
+            mockk<Agent>(),
+            AgentSessionContext.SinkInfo(
+                sink = sink,
+                threadId = THREAD_ID,
+                runId = RUN_ID
+            )
+        )
+        every {
+            externalAgentService.resolveEnabledConfigId(USER_ID, CONFIG_ID)
+        } returns CONFIG_ID
+        every {
+            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
+        } returns enabledAgentInfo()
+        every {
+            gateway.stream(
+                userId = USER_ID,
+                configId = CONFIG_ID,
+                input = any<ExternalAgentInput>()
+            )
+        } returns Flux.just(
+            ExternalAgentEvent.TextDelta("hello"),
+            ExternalAgentEvent.ConversationId("conversation-1"),
+            ExternalAgentEvent.Done
+        )
+        val tools = ExternalAgentSupervisorTools(
+            externalAgentService = externalAgentService,
+            gateway = gateway,
+            sessionContext = sessionContext,
+            userIdSupplier = { USER_ID },
+            threadId = THREAD_ID
+        )
+
+        tools.callExternalAgent(
+            configId = CONFIG_ID,
+            query = "say hello"
+        )
+
+        assertEquals(2, emittedEvents.size)
+        val progressEvent = emittedEvents[0] as? AguiEvent.Custom
+        assertNotNull(progressEvent)
+        assertEquals("subagent_event", progressEvent?.name)
+        val progressData = progressEvent?.value as? Map<*, *>
+        assertEquals(EXTERNAL_AGENT_NAME, progressData?.get("agentName"))
+        assertEquals("ASSISTANT", progressData?.get("eventType"))
+        assertEquals("hello", progressData?.get("content"))
+        assertEquals(false, progressData?.get("isLast"))
+        val doneEvent = emittedEvents[1] as? AguiEvent.Custom
+        assertNotNull(doneEvent)
+        assertEquals("subagent_event", doneEvent?.name)
+        val doneData = doneEvent?.value as? Map<*, *>
+        assertEquals(true, doneData?.get("isLast"))
     }
 
     @Test
@@ -106,5 +178,24 @@ class ExternalAgentSupervisorToolsTest {
         private const val USER_ID = "tester"
         private const val CONFIG_ID = "config-1"
         private const val AGENT_NAME = "agent_name"
+        private const val EXTERNAL_AGENT_NAME = "knot-agent"
+        private const val THREAD_ID = "thread-1"
+        private const val RUN_ID = "run-1"
+
+        private fun enabledAgentInfo(): ExternalAgentInfo {
+            return ExternalAgentInfo(
+                id = CONFIG_ID,
+                userId = USER_ID,
+                agentName = EXTERNAL_AGENT_NAME,
+                description = "demo",
+                platform = "KNOT",
+                agentId = "agent-id",
+                apiUrl = "https://example.com",
+                headers = null,
+                enabled = true,
+                createdTime = 0L,
+                updatedTime = 0L
+            )
+        }
     }
 }
