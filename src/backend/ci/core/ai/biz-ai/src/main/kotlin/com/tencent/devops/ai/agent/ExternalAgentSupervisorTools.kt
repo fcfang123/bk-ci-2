@@ -161,7 +161,16 @@ class ExternalAgentSupervisorTools(
         if (!isLast && content.isNullOrBlank()) {
             return
         }
-        val sinkInfo = threadId?.let { sessionContext.getSinkByThreadId(it) } ?: return
+        val sinkInfo = threadId?.let { sessionContext.getSinkByThreadId(it) }
+        if (sinkInfo == null) {
+            logger.warn(
+                "[ExternalAgentSupervisorTool] progress dropped: threadId={}, configId={}, eventType={}",
+                threadId,
+                configId,
+                eventType
+            )
+            return
+        }
         val data = mutableMapOf<String, Any?>(
             "agentName" to agentName,
             "configId" to configId,

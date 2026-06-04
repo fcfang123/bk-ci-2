@@ -6,7 +6,10 @@
 
 ## Requirements
 
-### Requirement: 外部智能体直连流式调用
+### Requirement: 外部智能体直连流式调用（非本期生产路径）
+
+> **说明**：该 Requirement 对应早期直连 API 方案，已随 archive proposal 归档。本期生产路径为
+> Supervisor + `call_external_agent` 轻量工具；直连网关能力仍保留在 `ExternalAgentGateway` 供工具层复用。
 
 系统必须提供用户选定外部智能体配置的直连流式调用路径，绕过 Supervisor 及任何外部智能体调度用 ReActAgent。
 
@@ -110,6 +113,12 @@
 - **则** 系统必须在支持的情况下取消上游第三方 HTTP 流
 - **并且** 系统必须释放单次请求相关资源
 
+#### Scenario: 流式总时长超限
+
+- **当** 自网关订阅第三方流起累计时长超过配置的 `streamTimeoutSeconds`
+- **则** 系统必须终止网关调用
+- **并且** 客户端或 Supervisor 工具调用方必须收到 `TIMEOUT` 类别错误
+
 ### Requirement: 配置兼容与校验
 
 系统必须在满足新网关运行时要求的前提下，保留现有外部智能体配置管理能力。
@@ -125,6 +134,13 @@
 - **当** 用户创建或更新外部智能体配置
 - **则** 系统必须按平台适配器要求校验平台支持与必填 URL/头字段
 - **并且** 对无效配置必须返回用户可理解的校验错误
+
+#### Scenario: headers 加密存储
+
+- **当** 用户创建或更新外部智能体配置的 headers
+- **则** 系统必须将 headers JSON 加密后写入 `T_AI_EXTERNAL_AGENT_CONFIG.HEADERS`
+- **并且** 列表 API 必须返回脱敏后的 headers
+- **并且** 网关运行时读取配置时必须解密 headers；历史明文记录在解密失败时可按明文兼容读取
 
 ### Requirement: 外部智能体调用可观测性
 

@@ -59,6 +59,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
             "[ExternalAgentGateway] BkAiDev stream start: userId={}, configId={}, platform={}, url={}",
             request.userId, config.id, config.platform, config.apiUrl
         )
+        val lineBuffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseBkAiDev)
         return webClient.post()
             .uri(config.apiUrl)
             .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +69,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
             .retrieve()
             .bodyToFlux<String>()
             .doOnNext { chunk ->
-                logger.info(
+                logger.debug(
                     "[ExternalAgentGateway] BkAiDev raw chunk: userId={}, configId={}, chars={}, shape={}",
                     request.userId,
                     config.id,
@@ -76,7 +77,8 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
                     ExternalAgentSseEventParser.describeChunk(chunk)
                 )
             }
-            .flatMapIterable { ExternalAgentSseEventParser.parseBkAiDev(it) }
+            .concatMap { chunk -> Flux.fromIterable(lineBuffer.accept(chunk)) }
+            .concatWith(Flux.defer { Flux.fromIterable(lineBuffer.flush()) })
             .doOnCancel {
                 logger.info(
                     "[ExternalAgentGateway] BkAiDev stream cancelled: userId={}, configId={}",

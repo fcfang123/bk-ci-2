@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
+import java.time.Duration
 
 class ExternalAgentGatewayTest {
 
@@ -65,6 +66,55 @@ class ExternalAgentGatewayTest {
         }
 
         assertEquals(ExternalAgentErrorCategory.TIMEOUT, error.category)
+    }
+
+    @Test
+    fun `stream should fail when total stream duration exceeds limit`() {
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        val gateway = newGateway(
+            adapters = listOf(DelayedAdapter("KNOT", Duration.ofSeconds(3))),
+            properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 2)
+        )
+
+        val error = assertThrows(ExternalAgentGatewayException::class.java) {
+            gateway.stream(USER_ID, CONFIG_ID, request()).blockLast()
+        }
+
+        assertEquals(ExternalAgentErrorCategory.TIMEOUT, error.category)
+    }
+
+    @Test
+    fun `stream should fail when upstream stalls after first event`() {
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        val gateway = newGateway(
+            adapters = listOf(StalledAfterFirstAdapter("KNOT")),
+            properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 1)
+        )
+
+        val error = assertThrows(ExternalAgentGatewayException::class.java) {
+            gateway.stream(USER_ID, CONFIG_ID, request()).blockLast()
+        }
+
+        assertEquals(ExternalAgentErrorCategory.TIMEOUT, error.category)
+    }
+
+    @Test
+    fun `stream should complete when total stream duration is within limit`() {
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        val gateway = newGateway(
+            adapters = listOf(DelayedAdapter("KNOT", Duration.ofMillis(100))),
+            properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 120)
+        )
+
+        val events = gateway.stream(USER_ID, CONFIG_ID, request()).collectList().block()
+
+        assertEquals(
+            listOf(
+                ExternalAgentEvent.TextDelta("first"),
+                ExternalAgentEvent.TextDelta("second")
+            ),
+            events
+        )
     }
 
     @Test
@@ -131,6 +181,34 @@ class ExternalAgentGatewayTest {
 
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
             return Flux.never()
+        }
+    }
+
+    private class StalledAfterFirstAdapter(
+        private val platform: String
+    ) : ExternalAgentAdapter {
+        override fun platform(): String = platform
+
+        override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
+            return Flux.concat(
+                Flux.just(ExternalAgentEvent.TextDelta("first")),
+                Flux.never()
+            )
+        }
+    }
+
+    private class DelayedAdapter(
+        private val platform: String,
+        private val delayAfterFirst: Duration
+    ) : ExternalAgentAdapter {
+        override fun platform(): String = platform
+
+        override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
+            return Flux.concat(
+                Flux.just(ExternalAgentEvent.TextDelta("first")),
+                Flux.just(ExternalAgentEvent.TextDelta("second"))
+                    .delayElements(delayAfterFirst)
+            )
         }
     }
 

@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.publisher.Signal
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
@@ -64,21 +66,23 @@ class ExternalAgentGateway @Autowired constructor(
             chatHistory = input.chatHistory
         )
 
-        return adapter.stream(externalRequest)
-            .timeout(Duration.ofSeconds(properties.firstTokenTimeoutSeconds))
-            .doOnNext { event ->
-                recordFirstToken(
-                    recorded = firstTokenRecorded,
-                    startedAt = startedAt,
-                    userId = userId,
-                    configId = configId,
-                    platform = config.platform,
-                    input = input
-                )
-                recordEventType(eventCount, eventTypeCounts, event)
-                recordEventSize(responseChars, event)
-            }
-            .timeout(Duration.ofSeconds(properties.streamTimeoutSeconds))
+        val firstTokenTimeout = Duration.ofSeconds(properties.firstTokenTimeoutSeconds)
+        val streamTimeout = Duration.ofSeconds(properties.streamTimeoutSeconds)
+        return withTotalTimeout(
+            stream = adapter.stream(externalRequest).timeout(Mono.delay(firstTokenTimeout)),
+            timeout = streamTimeout
+        ).doOnNext { event ->
+            recordFirstToken(
+                recorded = firstTokenRecorded,
+                startedAt = startedAt,
+                userId = userId,
+                configId = configId,
+                platform = config.platform,
+                input = input
+            )
+            recordEventType(eventCount, eventTypeCounts, event)
+            recordEventSize(responseChars, event)
+        }
             .doOnCancel {
                 logger.info(
                     "[ExternalAgentGateway] stream cancelled: userId={}, configId={}, platform={}, " +
@@ -157,6 +161,24 @@ class ExternalAgentGateway @Autowired constructor(
                     error.message
                 )
             }
+    }
+
+    private fun withTotalTimeout(
+        stream: Flux<ExternalAgentEvent>,
+        timeout: Duration
+    ): Flux<ExternalAgentEvent> {
+        val timeoutSignal = Mono.delay(timeout)
+            .map<Signal<ExternalAgentEvent>> { Signal.error(timeoutException()) }
+        return Flux.merge(stream.materialize(), timeoutSignal)
+            .takeUntil { it.isOnComplete || it.isOnError }
+            .dematerialize()
+    }
+
+    private fun timeoutException(): ExternalAgentGatewayException {
+        return ExternalAgentGatewayException(
+            category = ExternalAgentErrorCategory.TIMEOUT,
+            message = "外部智能体响应超时，请稍后重试"
+        )
     }
 
     private fun recordFirstToken(

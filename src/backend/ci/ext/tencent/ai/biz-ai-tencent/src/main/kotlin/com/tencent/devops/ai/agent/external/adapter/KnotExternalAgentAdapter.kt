@@ -51,6 +51,7 @@ class KnotExternalAgentAdapter : ExternalAgentAdapter {
             "[ExternalAgentGateway] Knot stream start: userId={}, configId={}, platform={}, url={}",
             request.userId, config.id, config.platform, config.apiUrl
         )
+        val lineBuffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseKnot)
         return webClient.post()
             .uri(config.apiUrl)
             .contentType(MediaType.APPLICATION_JSON)
@@ -60,7 +61,7 @@ class KnotExternalAgentAdapter : ExternalAgentAdapter {
             .retrieve()
             .bodyToFlux<String>()
             .doOnNext { chunk ->
-                logger.info(
+                logger.debug(
                     "[ExternalAgentGateway] Knot raw chunk: userId={}, configId={}, chars={}, shape={}",
                     request.userId,
                     config.id,
@@ -68,7 +69,8 @@ class KnotExternalAgentAdapter : ExternalAgentAdapter {
                     ExternalAgentSseEventParser.describeChunk(chunk)
                 )
             }
-            .flatMapIterable { ExternalAgentSseEventParser.parseKnot(it) }
+            .concatMap { chunk -> Flux.fromIterable(lineBuffer.accept(chunk)) }
+            .concatWith(Flux.defer { Flux.fromIterable(lineBuffer.flush()) })
             .doOnCancel {
                 logger.info(
                     "[ExternalAgentGateway] Knot stream cancelled: userId={}, configId={}",

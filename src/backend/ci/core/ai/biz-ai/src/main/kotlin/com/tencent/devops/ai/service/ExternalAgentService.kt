@@ -36,12 +36,14 @@ import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.exception.ErrorCodeException
+import com.tencent.devops.common.api.util.AESUtil
 import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.api.util.UUIDUtil
 import com.tencent.devops.model.ai.tables.records.TAiExternalAgentConfigRecord
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.ZoneOffset
 
@@ -52,7 +54,9 @@ import java.time.ZoneOffset
 class ExternalAgentService @Autowired constructor(
     private val dslContext: DSLContext,
     private val dao: ExternalAgentConfigDao,
-    adapters: List<ExternalAgentAdapter> = emptyList()
+    adapters: List<ExternalAgentAdapter> = emptyList(),
+    @Value("\${aes.aesKey}")
+    private val aesKey: String = ""
 ) {
 
     private val adapterMap = adapters.associateBy { it.platform().uppercase() }
@@ -82,7 +86,7 @@ class ExternalAgentService @Autowired constructor(
             platform = request.platform,
             agentId = request.agentId,
             apiUrl = request.apiUrl,
-            headers = request.headers,
+            headers = encryptHeaders(request.headers),
             enabled = request.enabled
         )
         val record = dao.getById(dslContext, id)
@@ -165,11 +169,12 @@ class ExternalAgentService @Autowired constructor(
             userId, configId
         )
         val record = getOwnedRecord(userId, configId)
+        val effectiveHeaders = decryptHeaders(request.headers ?: record.headers)
         validateConfig(
             platform = request.platform ?: record.platform,
             agentId = request.agentId ?: record.agentId,
             apiUrl = request.apiUrl ?: record.apiUrl,
-            headers = request.headers ?: record.headers
+            headers = effectiveHeaders
         )
         return dao.update(
             dslContext = dslContext,
@@ -179,7 +184,7 @@ class ExternalAgentService @Autowired constructor(
             platform = request.platform,
             agentId = request.agentId,
             apiUrl = request.apiUrl,
-            headers = request.headers,
+            headers = resolveEncryptedHeaders(request.headers),
             enabled = request.enabled
         ) > 0
     }
@@ -257,6 +262,7 @@ class ExternalAgentService @Autowired constructor(
         record: TAiExternalAgentConfigRecord,
         maskHeaders: Boolean
     ): ExternalAgentInfo {
+        val decryptedHeaders = decryptHeaders(record.headers)
         return ExternalAgentInfo(
             id = record.id,
             userId = record.userId,
@@ -265,7 +271,7 @@ class ExternalAgentService @Autowired constructor(
             platform = record.platform,
             agentId = record.agentId,
             apiUrl = record.apiUrl,
-            headers = if (maskHeaders) maskHeaders(record.headers) else record.headers,
+            headers = if (maskHeaders) maskHeaderValues(decryptedHeaders) else decryptedHeaders,
             enabled = record.enabled,
             createdTime = record.createdTime
                 .toInstant(ZoneOffset.ofHours(8)).toEpochMilli(),
@@ -274,12 +280,51 @@ class ExternalAgentService @Autowired constructor(
         )
     }
 
-    private fun maskHeaders(headers: String?): String? {
+    private fun maskHeaderValues(headers: String?): String? {
         val parsedHeaders = AiMcpServerService.parseHeaders(headers)
         if (parsedHeaders.isEmpty()) {
             return null
         }
         return JsonUtil.toJson(parsedHeaders.mapValues { MASKED_HEADER_VALUE })
+    }
+
+    private fun encryptHeaders(value: String?): String? {
+        if (value.isNullOrBlank()) {
+            return value
+        }
+        requireAesKey()
+        return AESUtil.encrypt(aesKey, value)
+    }
+
+    private fun decryptHeaders(value: String?): String? {
+        if (value.isNullOrBlank()) {
+            return value
+        }
+        if (aesKey.isBlank()) {
+            return value
+        }
+        return try {
+            AESUtil.decrypt(aesKey, value)
+        } catch (ignored: Exception) {
+            value
+        }
+    }
+
+    private fun resolveEncryptedHeaders(incoming: String?): String? {
+        return when (incoming) {
+            null -> null
+            "" -> ""
+            else -> encryptHeaders(incoming)
+        }
+    }
+
+    private fun requireAesKey() {
+        if (aesKey.isBlank()) {
+            throw ErrorCodeException(
+                errorCode = AiMessageCode.USER_LLM_CONFIG_AES_KEY_MISSING,
+                defaultMessage = "config[aes.ai] is not found"
+            )
+        }
     }
 
     companion object {

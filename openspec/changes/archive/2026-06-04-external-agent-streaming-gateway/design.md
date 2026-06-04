@@ -225,7 +225,7 @@ AG-UI 事件对象下发。文本消息事件使用 `TEXT_MESSAGE_START`、`TEXT
 
 ### Knot 平台
 
-Knot 推荐使用 AG-UI 协议端点，例如 `https://knot.woa.com/apigw/api/v1/agents/agui/{agent_id}`。请求体为
+Knot 推荐使用 AG-UI 协议端点。
 `input.message`、`input.conversation_id`、`input.stream=true`，可选携带 `model`、`enable_web_search`、
 `chat_extra`、`temperature` 等字段；鉴权通过 `x-knot-api-token` 与 `x-knot-api-user`。
 
