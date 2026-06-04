@@ -76,13 +76,13 @@ class ExternalAgentTools(
             ).doOnNext { event ->
                 when (event) {
                     is ExternalAgentEvent.TextDelta -> {
-                        content.append(event.delta)
-                        emitProgress(
+                        reasoningPlaceholderEmitted = emitTextDeltaProgress(
                             agentName = agentDisplayName,
                             configId = resolvedConfigId,
-                            eventType = EVENT_TYPE_ASSISTANT,
-                            content = event.delta,
-                            conversationId = externalConversationId
+                            delta = event.delta,
+                            conversationId = externalConversationId,
+                            content = content,
+                            reasoningPlaceholderEmitted = reasoningPlaceholderEmitted
                         )
                     }
                     is ExternalAgentEvent.ConversationId -> {
@@ -239,6 +239,38 @@ class ExternalAgentTools(
         return reasoningPlaceholderEmitted || isReasoningPlaceholder
     }
 
+    private fun emitTextDeltaProgress(
+        agentName: String,
+        configId: String,
+        delta: String,
+        conversationId: String?,
+        content: StringBuilder,
+        reasoningPlaceholderEmitted: Boolean
+    ): Boolean {
+        if (isReasoningPlaceholderContent(delta)) {
+            if (!reasoningPlaceholderEmitted) {
+                emitProgress(
+                    agentName = agentName,
+                    configId = configId,
+                    eventType = EVENT_TYPE_REASONING,
+                    content = DEFAULT_REASONING_PLACEHOLDER,
+                    conversationId = conversationId,
+                    extraData = mapOf("externalEventType" to TEXT_DELTA_REASONING_PLACEHOLDER)
+                )
+            }
+            return true
+        }
+        content.append(delta)
+        emitProgress(
+            agentName = agentName,
+            configId = configId,
+            eventType = EVENT_TYPE_ASSISTANT,
+            content = delta,
+            conversationId = conversationId
+        )
+        return reasoningPlaceholderEmitted
+    }
+
     private fun extractCustomContent(data: Map<String, Any?>): String? {
         val rawEvent = data["rawEvent"] as? Map<*, *>
         return listOf(
@@ -273,6 +305,7 @@ class ExternalAgentTools(
         private const val CUSTOM_EVENT_NAME = "subagent_event"
         private const val EVENT_TYPE_ASSISTANT = "ASSISTANT"
         private const val EVENT_TYPE_REASONING = "REASONING"
+        private const val TEXT_DELTA_REASONING_PLACEHOLDER = "TEXT_DELTA_REASONING_PLACEHOLDER"
         private const val MAX_CONTENT = 2000
         private const val DEFAULT_REASONING_PLACEHOLDER = "正在思考..."
         private val REASONING_EVENT_KEYWORDS = listOf("REASON", "THINK")
