@@ -1,6 +1,6 @@
-package com.tencent.devops.ai.agent.external.adapter
+package com.tencent.devops.ai.agent.external.util
 
-import com.tencent.devops.ai.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 
 /**
  * Accumulates partial SSE chunks until complete lines (terminated by `\n`) are available for parsing.

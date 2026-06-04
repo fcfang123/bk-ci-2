@@ -1,8 +1,8 @@
 package com.tencent.devops.ai.agent.external.adapter
 
-import com.tencent.devops.ai.external.ExternalAgentConfigValidationContext
-import com.tencent.devops.ai.external.ExternalAgentErrorCategory
-import com.tencent.devops.ai.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows

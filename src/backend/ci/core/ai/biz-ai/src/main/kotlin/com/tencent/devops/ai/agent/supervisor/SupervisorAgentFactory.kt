@@ -28,13 +28,13 @@
 package com.tencent.devops.ai.agent.supervisor
 
 import com.tencent.devops.ai.agent.CommonTools
-import com.tencent.devops.ai.agent.ExternalAgentSupervisorTools
+import com.tencent.devops.ai.agent.external.ExternalAgentTools
 import com.tencent.devops.ai.agent.SubAgentDefinition
 import com.tencent.devops.ai.agent.SubAgentFactory
 import com.tencent.devops.ai.context.AgentSessionContext
 import com.tencent.devops.ai.context.AiChatContext
 import com.tencent.devops.ai.context.ContextMarker
-import com.tencent.devops.ai.external.ExternalAgentGateway
+import com.tencent.devops.ai.agent.external.ExternalAgentGateway
 import com.tencent.devops.ai.pojo.ChatContextDTO
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.properties.AiSupervisorProperties
@@ -171,9 +171,9 @@ class SupervisorAgentFactory(
         if (externalAgentGatewayProperties.enabled &&
             externalAgentGatewayProperties.supervisorToolEnabled) {
             toolkit.registerTool(
-                ExternalAgentSupervisorTools(
+                ExternalAgentTools(
                     externalAgentService = externalAgentService,
-                    gateway = externalAgentGateway,
+                    externalAgentGateway = externalAgentGateway,
                     sessionContext = sessionContext,
                     userIdSupplier = { userId },
                     threadId = capturedThreadId
@@ -303,6 +303,10 @@ class SupervisorAgentFactory(
                 )
             }
             appendLine("当用户在普通消息中使用 @外部智能体名称 或 @config_id 时，优先调用匹配配置。")
+            appendLine(
+                "多轮调用：优先把上次工具返回的 conversationId 作为 conversation_id；" +
+                    "无 conversationId 且需补充上下文时，再传 chat_history（JSON 数组，role 为 user/assistant/system）。"
+            )
         }.trimEnd()
     }
 

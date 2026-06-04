@@ -1,9 +1,9 @@
-package com.tencent.devops.ai.agent.external.adapter
+package com.tencent.devops.ai.agent.external.util
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.tencent.devops.ai.external.ExternalAgentErrorCategory
-import com.tencent.devops.ai.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 import org.slf4j.LoggerFactory
 
 object ExternalAgentSseEventParser {

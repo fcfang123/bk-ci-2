@@ -3,7 +3,7 @@ package com.tencent.devops.ai.config
 import com.tencent.devops.ai.agent.SubAgentDefinition
 import com.tencent.devops.ai.agent.SubAgentFactory
 import com.tencent.devops.ai.agent.supervisor.SupervisorAgentFactory
-import com.tencent.devops.ai.external.ExternalAgentGateway
+import com.tencent.devops.ai.agent.external.ExternalAgentGateway
 import com.tencent.devops.ai.properties.AiSupervisorProperties
 import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.AgentSysPromptService

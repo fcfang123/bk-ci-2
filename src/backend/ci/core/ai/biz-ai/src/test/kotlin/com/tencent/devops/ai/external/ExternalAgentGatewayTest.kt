@@ -1,5 +1,12 @@
 package com.tencent.devops.ai.external
 
+import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentGateway
+import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.agent.external.ExternalAgentInput
+import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.ExternalAgentService

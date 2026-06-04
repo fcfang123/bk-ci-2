@@ -1,7 +1,9 @@
 package com.tencent.devops.ai.agent.external.adapter
 
-import com.tencent.devops.ai.external.ExternalAgentErrorCategory
-import com.tencent.devops.ai.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.util.ExternalAgentSseEventParser
+import com.tencent.devops.ai.agent.external.util.ExternalAgentSseLineBuffer
+import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

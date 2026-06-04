@@ -1,10 +1,10 @@
 package com.tencent.devops.ai.service
 
 import com.tencent.devops.ai.dao.ExternalAgentConfigDao
-import com.tencent.devops.ai.external.ExternalAgentAdapter
-import com.tencent.devops.ai.external.ExternalAgentConfigValidationContext
-import com.tencent.devops.ai.external.ExternalAgentEvent
-import com.tencent.devops.ai.external.ExternalAgentRequest
+import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.util.AESUtil

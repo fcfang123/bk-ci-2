@@ -1,11 +1,6 @@
-package com.tencent.devops.ai.agent
+package com.tencent.devops.ai.agent.external
 
 import com.tencent.devops.ai.context.AgentSessionContext
-import com.tencent.devops.ai.external.ExternalAgentErrorCategory
-import com.tencent.devops.ai.external.ExternalAgentEvent
-import com.tencent.devops.ai.external.ExternalAgentGateway
-import com.tencent.devops.ai.external.ExternalAgentGatewayException
-import com.tencent.devops.ai.external.ExternalAgentInput
 import com.tencent.devops.ai.service.ExternalAgentService
 import com.tencent.devops.common.api.util.JsonUtil
 import io.agentscope.core.agui.event.AguiEvent
@@ -15,9 +10,9 @@ import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import java.util.function.Supplier
 
-class ExternalAgentSupervisorTools(
+class ExternalAgentTools(
     private val externalAgentService: ExternalAgentService,
-    private val gateway: ExternalAgentGateway,
+    private val externalAgentGateway: ExternalAgentGateway,
     private val sessionContext: AgentSessionContext,
     private val userIdSupplier: Supplier<String>,
     private val threadId: String?
@@ -26,15 +21,31 @@ class ExternalAgentSupervisorTools(
     @Tool(
         name = "call_external_agent",
         description = "调用用户已启用的外部智能体配置。适合用户明确 @ 外部智能体，" +
-            "或问题需要委派给某个外部智能体处理时使用。"
+            "或问题需要委派给某个外部智能体处理时使用。多轮对话时优先复用上次返回的 conversation_id；" +
+            "无 conversation_id 且需要携带上下文时，可传 chat_history。"
     )
     fun callExternalAgent(
         @ToolParam(name = "config_id", description = "外部智能体配置 ID 或显示名称")
         configId: String,
         @ToolParam(name = "query", description = "需要交给外部智能体处理的问题")
         query: String,
-        @ToolParam(name = "conversation_id", description = "外部平台会话 ID，可选", required = false)
-        conversationId: String? = null
+        @ToolParam(
+            name = "conversation_id",
+            description = "外部平台会话 ID。多轮续聊时传入上次工具返回的 conversationId",
+            required = false
+        )
+        conversationId: String? = null,
+        @ToolParam(
+            name = "chat_history",
+            description = "可选。AIDev 等多轮对话时的会话历史，值为 JSON 数组字符串；" +
+                "数组元素为对象，固定两个字段：role（user/assistant/system）、content（消息正文）。" +
+                "示例：[{\"role\":\"user\",\"content\":\"第一轮问题\"}," +
+                "{\"role\":\"assistant\",\"content\":\"第一轮回答\"}]。" +
+                "当前轮用户问题仍放在 query，不要重复写入 chat_history 最后一条。" +
+                "未传 conversation_id 时由平台据此续聊；已传 conversation_id 时平台忽略此项。",
+            required = false
+        )
+        chatHistory: String? = null
     ): String {
         val userId = userIdSupplier.get()
         var resolvedConfigId = configId
@@ -49,13 +60,17 @@ class ExternalAgentSupervisorTools(
             agentDisplayName = externalAgentService.getEnabled(userId, resolvedConfigId).agentName
                 .takeIf { it.isNotBlank() }
                 ?: resolvedConfigId
-            gateway.stream(
+            val sinkInfo = threadId?.let { sessionContext.getSinkByThreadId(it) }
+            val parsedChatHistory = ExternalAgentChatHistoryParser.parse(chatHistory)
+            externalAgentGateway.stream(
                 userId = userId,
                 configId = resolvedConfigId,
                 input = ExternalAgentInput(
                     query = query,
                     conversationId = conversationId.orEmpty(),
-                    threadId = threadId
+                    threadId = threadId,
+                    runId = sinkInfo?.runId,
+                    chatHistory = parsedChatHistory
                 )
             ).doOnNext { event ->
                 when (event) {
@@ -224,7 +239,7 @@ class ExternalAgentSupervisorTools(
     }
 
     companion object {
-        private val logger = LoggerFactory.getLogger(ExternalAgentSupervisorTools::class.java)
+        private val logger = LoggerFactory.getLogger(ExternalAgentTools::class.java)
         private const val CUSTOM_EVENT_NAME = "subagent_event"
         private const val EVENT_TYPE_ASSISTANT = "ASSISTANT"
         private const val EVENT_TYPE_REASONING = "REASONING"

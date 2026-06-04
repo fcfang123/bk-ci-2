@@ -29,9 +29,9 @@ package com.tencent.devops.ai.service
 
 import com.tencent.devops.ai.constant.AiMessageCode
 import com.tencent.devops.ai.dao.ExternalAgentConfigDao
-import com.tencent.devops.ai.external.ExternalAgentAdapter
-import com.tencent.devops.ai.external.ExternalAgentConfigValidationContext
-import com.tencent.devops.ai.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate

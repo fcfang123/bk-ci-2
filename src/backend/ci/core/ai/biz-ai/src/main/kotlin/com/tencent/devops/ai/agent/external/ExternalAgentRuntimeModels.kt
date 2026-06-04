@@ -1,4 +1,4 @@
-package com.tencent.devops.ai.external
+package com.tencent.devops.ai.agent.external
 
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 

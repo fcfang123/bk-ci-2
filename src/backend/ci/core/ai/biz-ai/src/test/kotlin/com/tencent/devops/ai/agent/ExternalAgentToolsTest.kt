@@ -1,15 +1,18 @@
 package com.tencent.devops.ai.agent
 
 import com.tencent.devops.ai.context.AgentSessionContext
-import com.tencent.devops.ai.external.ExternalAgentEvent
-import com.tencent.devops.ai.external.ExternalAgentGateway
-import com.tencent.devops.ai.external.ExternalAgentInput
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentGateway
+import com.tencent.devops.ai.agent.external.ExternalAgentInput
+import com.tencent.devops.ai.agent.external.ExternalAgentTools
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.service.ExternalAgentService
 import io.agentscope.core.agent.Agent
 import io.agentscope.core.agui.event.AguiEvent
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -17,7 +20,7 @@ import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 
-class ExternalAgentSupervisorToolsTest {
+class ExternalAgentToolsTest {
 
     private val externalAgentService = mockk<ExternalAgentService>()
     private val gateway = mockk<ExternalAgentGateway>()
@@ -42,13 +45,7 @@ class ExternalAgentSupervisorToolsTest {
             ExternalAgentEvent.ConversationId("conversation-1"),
             ExternalAgentEvent.Done
         )
-        val tools = ExternalAgentSupervisorTools(
-            externalAgentService = externalAgentService,
-            gateway = gateway,
-            sessionContext = AgentSessionContext(),
-            userIdSupplier = { USER_ID },
-            threadId = "thread-1"
-        )
+        val tools = createTools(threadId = "thread-1")
 
         val result = tools.callExternalAgent(
             configId = CONFIG_ID,
@@ -76,13 +73,7 @@ class ExternalAgentSupervisorToolsTest {
                 input = any<ExternalAgentInput>()
             )
         } returns Flux.just(ExternalAgentEvent.TextDelta("ok"), ExternalAgentEvent.Done)
-        val tools = ExternalAgentSupervisorTools(
-            externalAgentService = externalAgentService,
-            gateway = gateway,
-            sessionContext = AgentSessionContext(),
-            userIdSupplier = { USER_ID },
-            threadId = "thread-1"
-        )
+        val tools = createTools(threadId = "thread-1")
 
         val result = tools.callExternalAgent(
             configId = AGENT_NAME,
@@ -123,13 +114,7 @@ class ExternalAgentSupervisorToolsTest {
             ExternalAgentEvent.ConversationId("conversation-1"),
             ExternalAgentEvent.Done
         )
-        val tools = ExternalAgentSupervisorTools(
-            externalAgentService = externalAgentService,
-            gateway = gateway,
-            sessionContext = sessionContext,
-            userIdSupplier = { USER_ID },
-            threadId = THREAD_ID
-        )
+        val tools = createTools(sessionContext = sessionContext, threadId = THREAD_ID)
 
         tools.callExternalAgent(
             configId = CONFIG_ID,
@@ -157,13 +142,7 @@ class ExternalAgentSupervisorToolsTest {
         every {
             externalAgentService.resolveEnabledConfigId(USER_ID, AGENT_NAME)
         } throws IllegalArgumentException("存在多个同名外部智能体，请改用配置 ID 调用")
-        val tools = ExternalAgentSupervisorTools(
-            externalAgentService = externalAgentService,
-            gateway = gateway,
-            sessionContext = AgentSessionContext(),
-            userIdSupplier = { USER_ID },
-            threadId = "thread-1"
-        )
+        val tools = createTools(threadId = "thread-1")
 
         val result = tools.callExternalAgent(
             configId = AGENT_NAME,
@@ -172,6 +151,62 @@ class ExternalAgentSupervisorToolsTest {
 
         assertTrue(result.contains("false"))
         assertTrue(result.contains("存在多个同名外部智能体"))
+    }
+
+    @Test
+    fun `callExternalAgent should pass supervisor provided chat history to gateway`() {
+        every {
+            externalAgentService.resolveEnabledConfigId(USER_ID, CONFIG_ID)
+        } returns CONFIG_ID
+        every {
+            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
+        } returns enabledAgentInfo()
+        val inputSlot = slot<ExternalAgentInput>()
+        every {
+            gateway.stream(
+                userId = USER_ID,
+                configId = CONFIG_ID,
+                input = capture(inputSlot)
+            )
+        } returns Flux.just(ExternalAgentEvent.TextDelta("ok"), ExternalAgentEvent.Done)
+
+        val tools = createTools(threadId = "thread-1")
+        tools.callExternalAgent(
+            configId = CONFIG_ID,
+            query = "round 2",
+            chatHistory = """[
+                {"role":"user","content":"round 1"},
+                {"role":"assistant","content":"answer 1"}
+            ]"""
+        )
+
+        verify(exactly = 1) {
+            gateway.stream(
+                userId = USER_ID,
+                configId = CONFIG_ID,
+                input = any<ExternalAgentInput>()
+            )
+        }
+        assertEquals(2, inputSlot.captured.chatHistory.size)
+        assertEquals("user", inputSlot.captured.chatHistory[0]["role"])
+        assertEquals("round 1", inputSlot.captured.chatHistory[0]["content"])
+        assertEquals("assistant", inputSlot.captured.chatHistory[1]["role"])
+        assertEquals("answer 1", inputSlot.captured.chatHistory[1]["content"])
+        assertEquals("round 2", inputSlot.captured.query)
+        assertTrue(inputSlot.captured.chatHistory.isNotEmpty())
+    }
+
+    private fun createTools(
+        sessionContext: AgentSessionContext = AgentSessionContext(),
+        threadId: String?
+    ): ExternalAgentTools {
+        return ExternalAgentTools(
+            externalAgentService = externalAgentService,
+            externalAgentGateway = gateway,
+            sessionContext = sessionContext,
+            userIdSupplier = { USER_ID },
+            threadId = threadId
+        )
     }
 
     companion object {

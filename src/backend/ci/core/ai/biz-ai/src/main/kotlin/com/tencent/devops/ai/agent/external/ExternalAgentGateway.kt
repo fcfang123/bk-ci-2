@@ -1,4 +1,4 @@
-package com.tencent.devops.ai.external
+package com.tencent.devops.ai.agent.external
 
 import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.ExternalAgentService
@@ -68,10 +68,8 @@ class ExternalAgentGateway @Autowired constructor(
 
         val firstTokenTimeout = Duration.ofSeconds(properties.firstTokenTimeoutSeconds)
         val streamTimeout = Duration.ofSeconds(properties.streamTimeoutSeconds)
-        return withTotalTimeout(
-            stream = adapter.stream(externalRequest).timeout(Mono.delay(firstTokenTimeout)),
-            timeout = streamTimeout
-        ).doOnNext { event ->
+        val stream = adapter.stream(externalRequest).timeout(Mono.delay(firstTokenTimeout))
+        return withTotalTimeout(stream, streamTimeout).doOnNext { event ->
             recordFirstToken(
                 recorded = firstTokenRecorded,
                 startedAt = startedAt,
@@ -82,85 +80,81 @@ class ExternalAgentGateway @Autowired constructor(
             )
             recordEventType(eventCount, eventTypeCounts, event)
             recordEventSize(responseChars, event)
-        }
-            .doOnCancel {
-                logger.info(
-                    "[ExternalAgentGateway] stream cancelled: userId={}, configId={}, platform={}, " +
-                            "threadId={}, runId={}, totalMs={}, size={}, category={}",
+        }.doOnCancel {
+            logger.info(
+                "[ExternalAgentGateway] stream cancelled: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, category={}",
+                userId,
+                configId,
+                config.platform,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                ExternalAgentErrorCategory.CANCELLED
+            )
+        }.doOnComplete {
+            val eventSummary = eventTypeCounts.entries
+                .sortedBy { it.key }
+                .joinToString(",") { "${it.key}=${it.value.get()}" }
+            if (responseChars.get() == 0) {
+                logger.warn(
+                    "[ExternalAgentGateway] stream completed without text delta: userId={}, configId={}, " +
+                            "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
                     userId,
                     configId,
                     config.platform,
                     input.threadId,
                     input.runId,
                     System.currentTimeMillis() - startedAt,
-                    responseChars.get(),
-                    ExternalAgentErrorCategory.CANCELLED
-                )
-            }
-            .doOnComplete {
-                val eventSummary = eventTypeCounts.entries
-                    .sortedBy { it.key }
-                    .joinToString(",") { "${it.key}=${it.value.get()}" }
-                if (responseChars.get() == 0) {
-                    logger.warn(
-                        "[ExternalAgentGateway] stream completed without text delta: userId={}, configId={}, " +
-                                "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
-                        userId,
-                        configId,
-                        config.platform,
-                        input.threadId,
-                        input.runId,
-                        System.currentTimeMillis() - startedAt,
-                        eventCount.get(),
-                        eventSummary
-                    )
-                }
-                logger.info(
-                    "[ExternalAgentGateway] stream complete: userId={}, configId={}, platform={}, " +
-                            "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
-                    userId,
-                    configId,
-                    config.platform,
-                    input.threadId,
-                    input.runId,
-                    System.currentTimeMillis() - startedAt,
-                    responseChars.get(),
                     eventCount.get(),
                     eventSummary
                 )
             }
-            .onErrorMap { error ->
-                if (error is ExternalAgentGatewayException) {
-                    error
-                } else if (error is TimeoutException) {
-                    ExternalAgentGatewayException(
-                        category = ExternalAgentErrorCategory.TIMEOUT,
-                        message = "外部智能体响应超时，请稍后重试"
-                    )
-                } else {
-                    ExternalAgentGatewayException(
-                        category = ExternalAgentErrorCategory.UPSTREAM_ERROR,
-                        message = "外部智能体调用失败，请稍后重试"
-                    )
-                }
-            }
-            .doOnError { error ->
-                val category = (error as? ExternalAgentGatewayException)?.category
-                    ?: ExternalAgentErrorCategory.UPSTREAM_ERROR
-                logger.warn(
-                    "[ExternalAgentGateway] stream failed: userId={}, configId={}, platform={}, " +
-                            "threadId={}, runId={}, totalMs={}, size={}, category={}, error={}",
-                    userId,
-                    configId,
-                    config.platform,
-                    input.threadId,
-                    input.runId,
-                    System.currentTimeMillis() - startedAt,
-                    responseChars.get(),
-                    category,
-                    error.message
+            logger.info(
+                "[ExternalAgentGateway] stream complete: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
+                userId,
+                configId,
+                config.platform,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                eventCount.get(),
+                eventSummary
+            )
+        }.onErrorMap { error ->
+            if (error is ExternalAgentGatewayException) {
+                error
+            } else if (error is TimeoutException) {
+                ExternalAgentGatewayException(
+                    category = ExternalAgentErrorCategory.TIMEOUT,
+                    message = "外部智能体响应超时，请稍后重试"
+                )
+            } else {
+                ExternalAgentGatewayException(
+                    category = ExternalAgentErrorCategory.UPSTREAM_ERROR,
+                    message = "外部智能体调用失败，请稍后重试"
                 )
             }
+        }.doOnError { error ->
+            val category = (error as? ExternalAgentGatewayException)?.category
+                ?: ExternalAgentErrorCategory.UPSTREAM_ERROR
+            logger.warn(
+                "[ExternalAgentGateway] stream failed: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, category={}, error={}",
+                userId,
+                configId,
+                config.platform,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                category,
+                error.message
+            )
+        }
     }
 
     private fun withTotalTimeout(

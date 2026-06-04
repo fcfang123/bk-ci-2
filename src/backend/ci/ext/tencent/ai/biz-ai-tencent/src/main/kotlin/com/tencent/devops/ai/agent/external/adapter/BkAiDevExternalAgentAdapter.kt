@@ -1,11 +1,13 @@
 package com.tencent.devops.ai.agent.external.adapter
 
-import com.tencent.devops.ai.external.ExternalAgentAdapter
-import com.tencent.devops.ai.external.ExternalAgentConfigValidationContext
-import com.tencent.devops.ai.external.ExternalAgentErrorCategory
-import com.tencent.devops.ai.external.ExternalAgentEvent
-import com.tencent.devops.ai.external.ExternalAgentGatewayException
-import com.tencent.devops.ai.external.ExternalAgentRequest
+import com.tencent.devops.ai.agent.external.util.ExternalAgentSseEventParser
+import com.tencent.devops.ai.agent.external.util.ExternalAgentSseLineBuffer
+import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.service.AiMcpServerService
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -21,7 +23,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
         .codecs { it.defaultCodecs().maxInMemorySize(MAX_RESPONSE_SIZE) }
         .build()
 
-    override fun platform(): String = PLATFORM
+    override fun platform(): String = "BKAIDEV"
 
     override fun validateConfig(config: ExternalAgentConfigValidationContext) {
         if (config.apiUrl.isBlank()) {
@@ -88,7 +90,6 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
     }
 
     companion object {
-        const val PLATFORM = "BKAIDEV"
         private const val HEADER_BKAPI_AUTHORIZATION = "X-Bkapi-Authorization"
         private const val HEADER_BKAIDEV_USER = "X-BKAIDEV-USER"
         private const val USER_ACCESS_TOKEN_KEY = "access_token"
