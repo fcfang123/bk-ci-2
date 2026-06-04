@@ -69,6 +69,15 @@ class ExternalAgentSseLineBufferTest {
     }
 
     @Test
+    fun `BkAiDev buffer should parse complete raw JSON chunk immediately`() {
+        val buffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseBkAiDev)
+        val chunk = """{"type":"TEXT_MESSAGE_CONTENT","delta":"hello"}"""
+
+        assertEquals(listOf(ExternalAgentEvent.TextDelta("hello")), buffer.accept(chunk))
+        assertEquals(emptyList<ExternalAgentEvent>(), buffer.flush())
+    }
+
+    @Test
     fun `Knot buffer should merge split JSON across two chunks`() {
         val buffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseKnot)
         val chunk1 = """data: {"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":"hel"""
@@ -99,6 +108,22 @@ class ExternalAgentSseLineBufferTest {
             ),
             buffer.flush()
         )
+    }
+
+    @Test
+    fun `Knot buffer should parse complete raw JSON chunk immediately`() {
+        val buffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseKnot)
+        val chunk =
+            """{"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":"hello","conversation_id":"conv-1"}}"""
+
+        assertEquals(
+            listOf(
+                ExternalAgentEvent.TextDelta("hello"),
+                ExternalAgentEvent.ConversationId("conv-1")
+            ),
+            buffer.accept(chunk)
+        )
+        assertEquals(emptyList<ExternalAgentEvent>(), buffer.flush())
     }
 
     @Test
@@ -150,5 +175,23 @@ class ExternalAgentSseLineBufferTest {
         val error = events.single()
         assertTrue(error is ExternalAgentEvent.Error)
         assertEquals(ExternalAgentErrorCategory.PARSE_ERROR, (error as ExternalAgentEvent.Error).category)
+    }
+
+    @Test
+    fun `buffer should keep waiting for split raw JSON without newline`() {
+        val buffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseKnot)
+
+        assertEquals(
+            emptyList<ExternalAgentEvent>(),
+            buffer.accept("""{"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":"hel""")
+        )
+        assertEquals(
+            listOf(
+                ExternalAgentEvent.TextDelta("hello"),
+                ExternalAgentEvent.ConversationId("conv-1")
+            ),
+            buffer.accept("""lo","conversation_id":"conv-1"}}""")
+        )
+        assertEquals(emptyList<ExternalAgentEvent>(), buffer.flush())
     }
 }
