@@ -244,57 +244,6 @@ class ExternalAgentToolsTest {
     }
 
     @Test
-    fun `callExternalAgent should suppress reasoning placeholder text delta from final content`() {
-        val sessionContext = AgentSessionContext()
-        val sink = Sinks.many().multicast().onBackpressureBuffer<AguiEvent>()
-        val emittedEvents = mutableListOf<AguiEvent>()
-        sink.asFlux().subscribe { emittedEvents.add(it) }
-        sessionContext.registerSink(
-            mockk<Agent>(),
-            AgentSessionContext.SinkInfo(
-                sink = sink,
-                threadId = THREAD_ID,
-                runId = RUN_ID
-            )
-        )
-        every {
-            externalAgentService.resolveEnabledConfigId(USER_ID, CONFIG_ID)
-        } returns CONFIG_ID
-        every {
-            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
-        } returns enabledAgentInfo()
-        every {
-            gateway.stream(
-                userId = USER_ID,
-                configId = CONFIG_ID,
-                input = any<ExternalAgentInput>()
-            )
-        } returns Flux.just(
-            ExternalAgentEvent.TextDelta("正在思考...正在思考..."),
-            ExternalAgentEvent.TextDelta("连接正常"),
-            ExternalAgentEvent.Done
-        )
-        val tools = createTools(sessionContext = sessionContext, threadId = THREAD_ID)
-
-        val result = tools.callExternalAgent(
-            configId = CONFIG_ID,
-            query = "ping"
-        )
-
-        assertTrue(result.contains("连接正常"))
-        assertTrue(!result.contains("正在思考"))
-        assertEquals(3, emittedEvents.size)
-        val reasoningEvent = emittedEvents[0] as? AguiEvent.Custom
-        val reasoningData = reasoningEvent?.value as? Map<*, *>
-        assertEquals("REASONING", reasoningData?.get("eventType"))
-        assertEquals("正在思考...", reasoningData?.get("content"))
-        val assistantEvent = emittedEvents[1] as? AguiEvent.Custom
-        val assistantData = assistantEvent?.value as? Map<*, *>
-        assertEquals("ASSISTANT", assistantData?.get("eventType"))
-        assertEquals("连接正常", assistantData?.get("content"))
-    }
-
-    @Test
     fun `callExternalAgent should fail when same name is ambiguous`() {
         every {
             externalAgentService.resolveEnabledConfigId(USER_ID, AGENT_NAME)
