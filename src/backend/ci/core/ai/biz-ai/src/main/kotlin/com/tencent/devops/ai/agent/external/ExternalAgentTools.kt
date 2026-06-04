@@ -54,6 +54,7 @@ class ExternalAgentTools(
         var externalConversationId: String? = conversationId?.takeIf { it.isNotBlank() }
         var errorCategory: ExternalAgentErrorCategory? = null
         var errorMessage: String? = null
+        var reasoningPlaceholderEmitted = false
 
         return try {
             resolvedConfigId = externalAgentService.resolveEnabledConfigId(userId, configId)
@@ -88,11 +89,12 @@ class ExternalAgentTools(
                         externalConversationId = event.conversationId
                     }
                     is ExternalAgentEvent.Custom -> {
-                        emitCustomProgress(
+                        reasoningPlaceholderEmitted = emitCustomProgress(
                             agentName = agentDisplayName,
                             configId = resolvedConfigId,
                             event = event,
-                            conversationId = externalConversationId
+                            conversationId = externalConversationId,
+                            reasoningPlaceholderEmitted = reasoningPlaceholderEmitted
                         )
                     }
                     is ExternalAgentEvent.Error -> {
@@ -209,14 +211,23 @@ class ExternalAgentTools(
         agentName: String,
         configId: String,
         event: ExternalAgentEvent.Custom,
-        conversationId: String?
-    ) {
+        conversationId: String?,
+        reasoningPlaceholderEmitted: Boolean
+    ): Boolean {
         val mappedEventType = if (isReasoningEventType(event.eventType)) {
             EVENT_TYPE_REASONING
         } else {
             EVENT_TYPE_ASSISTANT
         }
-        val content = extractCustomContent(event.data)
+        val rawContent = extractCustomContent(event.data)
+        val isReasoningPlaceholder = mappedEventType == EVENT_TYPE_REASONING &&
+            !rawContent.isNullOrBlank() &&
+            isReasoningPlaceholderContent(rawContent)
+        val content = when {
+            !isReasoningPlaceholder -> rawContent
+            reasoningPlaceholderEmitted -> null
+            else -> DEFAULT_REASONING_PLACEHOLDER
+        }
         emitProgress(
             agentName = agentName,
             configId = configId,
@@ -225,6 +236,7 @@ class ExternalAgentTools(
             conversationId = conversationId,
             extraData = mapOf("externalEventType" to event.eventType)
         )
+        return reasoningPlaceholderEmitted || isReasoningPlaceholder
     }
 
     private fun extractCustomContent(data: Map<String, Any?>): String? {
@@ -244,12 +256,26 @@ class ExternalAgentTools(
         }
     }
 
+    private fun isReasoningPlaceholderContent(content: String): Boolean {
+        val normalized = content
+            .replace(Regex("\\s+"), "")
+            .replace(Regex("[.。,…，、!！?？~～:：;；·•\\-]+"), "")
+        if (normalized.isBlank()) {
+            return false
+            }
+        return REASONING_PLACEHOLDER_TOKENS.any { token ->
+            normalized.replace(token, "").isEmpty()
+        }
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger(ExternalAgentTools::class.java)
         private const val CUSTOM_EVENT_NAME = "subagent_event"
         private const val EVENT_TYPE_ASSISTANT = "ASSISTANT"
         private const val EVENT_TYPE_REASONING = "REASONING"
         private const val MAX_CONTENT = 2000
+        private const val DEFAULT_REASONING_PLACEHOLDER = "正在思考..."
         private val REASONING_EVENT_KEYWORDS = listOf("REASON", "THINK")
+        private val REASONING_PLACEHOLDER_TOKENS = listOf("正在思考", "思考中")
     }
 }

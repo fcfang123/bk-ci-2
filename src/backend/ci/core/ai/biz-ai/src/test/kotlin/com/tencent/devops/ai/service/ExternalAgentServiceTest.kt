@@ -220,7 +220,7 @@ class ExternalAgentServiceTest {
                 apiUrl = "https://example.com/chat_completion",
                 authConfig = ExternalAgentAuthConfig(
                     authMode = ExternalAgentAuthMode.USER,
-                    accessToken = "token"
+                    values = mapOf("accessToken" to "token")
                 ),
                 enabled = true
             )
@@ -235,7 +235,7 @@ class ExternalAgentServiceTest {
         assertNotNull(info.authConfig)
         val authConfig = info.authConfig!!
         assertEquals(ExternalAgentAuthMode.USER, authConfig.authMode)
-        assertEquals(MASKED_HEADER_VALUE, authConfig.accessToken)
+        assertEquals(MASKED_HEADER_VALUE, authConfig.values["accessToken"])
         assertEquals(mapOf("access_token" to "token"), authHeader)
         assertFalse(parsedHeaders["X-Bkapi-Authorization"]!!.contains('\n'))
     }
@@ -279,15 +279,14 @@ class ExternalAgentServiceTest {
             CONFIG_ID,
             ExternalAgentUpdate(
                 authConfig = ExternalAgentAuthConfig(
-                    authMode = ExternalAgentAuthMode.APP,
-                    bkAiDevUser = "new-user"
+                    authMode = ExternalAgentAuthMode.APP
                 )
             )
         )
 
         val decryptedHeaders = AESUtil.decrypt(AES_KEY, persistedHeaders!!)
         val parsedHeaders = AiMcpServerService.parseHeaders(decryptedHeaders)
-        assertEquals("new-user", parsedHeaders["X-BKAIDEV-USER"])
+        assertEquals(USER_ID, parsedHeaders["X-BKAIDEV-USER"])
         assertEquals(
             mapOf(
                 "bk_app_code" to "app",
@@ -310,8 +309,19 @@ class ExternalAgentServiceTest {
 
         val info = service.getEnabled(USER_ID, CONFIG_ID)
 
-        assertEquals("secret-token", info.authConfig?.knotApiToken)
-        assertEquals("tester", info.authConfig?.knotApiUser)
+        assertEquals("secret-token", info.authConfig?.values?.get("knotApiToken"))
+        assertEquals(null, info.authConfig?.values?.get("knotApiUser"))
+    }
+
+    @Test
+    fun `listPlatformConfigs should only expose user editable fields`() {
+        val platformConfigs = service.listPlatformConfigs()
+
+        val bkAiDevFields = platformConfigs.first { it.platform == ExternalAgentPlatform.BKAIDEV }.authFields
+        val knotFields = platformConfigs.first { it.platform == ExternalAgentPlatform.KNOT }.authFields
+
+        assertEquals(setOf("bkAppCode", "bkAppSecret", "accessToken"), bkAiDevFields.map { it.key }.toSet())
+        assertEquals(setOf("knotApiToken"), knotFields.map { it.key }.toSet())
     }
 
     private fun createRequest(): ExternalAgentCreate {
