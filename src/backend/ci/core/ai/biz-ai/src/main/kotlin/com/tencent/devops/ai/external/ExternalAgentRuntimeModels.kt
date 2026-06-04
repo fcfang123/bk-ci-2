@@ -1,8 +1,6 @@
 package com.tencent.devops.ai.external
 
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
-import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 
 data class ExternalAgentInput(
     val query: String,
@@ -69,40 +67,3 @@ class ExternalAgentGatewayException(
     val category: ExternalAgentErrorCategory,
     override val message: String
 ) : RuntimeException(message)
-
-interface ExternalAgentAdapter {
-    fun platform(): String
-
-    fun validateConfig(config: ExternalAgentConfigValidationContext) {}
-
-    fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent>
-
-    fun call(request: ExternalAgentRequest): Mono<ExternalAgentResult> {
-        return stream(request)
-            .collect(
-                { ExternalAgentResultBuilder() },
-                { builder, event -> builder.accept(event) }
-            )
-            .map { it.build() }
-    }
-}
-
-private class ExternalAgentResultBuilder {
-    private val content = StringBuilder()
-    private var conversationId: String? = null
-
-    fun accept(event: ExternalAgentEvent) {
-        when (event) {
-            is ExternalAgentEvent.TextDelta -> content.append(event.delta)
-            is ExternalAgentEvent.ConversationId -> conversationId = event.conversationId
-            else -> {}
-        }
-    }
-
-    fun build(): ExternalAgentResult {
-        return ExternalAgentResult(
-            content = content.toString(),
-            conversationId = conversationId
-        )
-    }
-}
