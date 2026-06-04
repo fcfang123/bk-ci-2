@@ -69,34 +69,34 @@ class ParamFacadeService @Autowired constructor(
         userId: String?,
         projectId: String,
         pipelineId: String?,
-        params: List<BuildFormProperty>,
-        channelCode: ChannelCode = ChannelCode.getRequestChannelCode()
+        params: List<BuildFormProperty>
     ): List<BuildFormProperty> {
-        return params.map {
-            when {
-                it.type == BuildFormPropertyType.SVN_TAG && !it.repoHashId.isNullOrBlank() ->
-                    addSvnTagDirectories(projectId, it)
-                it.type == BuildFormPropertyType.GIT_REF && !it.repoHashId.isNullOrBlank() ->
-                    addGitRefs(projectId, it)
-                it.type == BuildFormPropertyType.CODE_LIB && it.scmType != null ->
-                    addCodelibProperties(userId, projectId, it)
-                it.type == BuildFormPropertyType.CONTAINER_TYPE && it.containerType != null ->
-                    addContainerTypeProperties(userId, projectId, it)
-                it.type == BuildFormPropertyType.ARTIFACTORY ->
-                    addArtifactoryProperties(userId, projectId, it)
-                it.type == BuildFormPropertyType.SUB_PIPELINE ->
-                    addSubPipelineProperties(
-                        userId = userId,
-                        projectId = projectId,
-                        pipelineId = pipelineId,
-                        subPipelineFormProperty = it,
-                        channelCode = channelCode
-                    )
-                it.type == BuildFormPropertyType.REPO_REF ->
-                    addRepoRefs(projectId, it)
-                else -> it
+        val filterParams = mutableListOf<BuildFormProperty>()
+        params.forEach {
+            if (it.type == BuildFormPropertyType.SVN_TAG && (!it.repoHashId.isNullOrBlank())) {
+                val svnTagBuildFormProperty = addSvnTagDirectories(projectId, it)
+                filterParams.add(svnTagBuildFormProperty)
+            } else if (it.type == BuildFormPropertyType.GIT_REF && (!it.repoHashId.isNullOrBlank())) {
+                val gitRefBuildFormProperty = addGitRefs(projectId, it)
+                filterParams.add(gitRefBuildFormProperty)
+            } else if (it.type == BuildFormPropertyType.CODE_LIB && it.scmType != null) {
+                filterParams.add(addCodelibProperties(userId, projectId, it))
+            } else if (it.type == BuildFormPropertyType.CONTAINER_TYPE && it.containerType != null) {
+                filterParams.add(addContainerTypeProperties(userId, projectId, it))
+            } else if (it.type == BuildFormPropertyType.ARTIFACTORY) {
+                filterParams.add(addArtifactoryProperties(userId, projectId, it))
+            } else if (it.type == BuildFormPropertyType.SUB_PIPELINE) {
+                filterParams.add(addSubPipelineProperties(userId, projectId, pipelineId, it))
+            } else if (it.type == BuildFormPropertyType.REPO_REF) {
+                filterParams.add(addRepoRefs(projectId, it))
+            } else if (it.type == BuildFormPropertyType.FORM_LIST) {
+                filterParams.add(copyFormProperty(property = it, options = listOf()))
+            } else {
+                filterParams.add(it)
             }
         }
+
+        return filterParams
     }
 
     fun filterOptions(
@@ -349,7 +349,8 @@ class ParamFacadeService @Autowired constructor(
             displayCondition = property.displayCondition,
             asInstanceInput = property.asInstanceInput,
             sensitive = property.sensitive,
-            constant = property.constant
+            constant = property.constant,
+            fields = property.fields
         )
     }
 
