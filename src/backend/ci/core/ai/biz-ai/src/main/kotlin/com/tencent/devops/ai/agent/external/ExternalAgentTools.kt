@@ -74,6 +74,15 @@ class ExternalAgentTools(
                     chatHistory = parsedChatHistory
                 )
             ).doOnNext { event ->
+                logger.info(
+                    "[ExternalAgentSupervisorTool] upstream event: userId={}, configId={}, threadId={}, " +
+                        "event={}, summary={}",
+                    userId,
+                    resolvedConfigId,
+                    threadId,
+                    event.javaClass.simpleName,
+                    summarizeExternalEvent(event)
+                )
                 when (event) {
                     is ExternalAgentEvent.TextDelta -> {
                         reasoningPlaceholderEmitted = emitTextDeltaProgress(
@@ -197,6 +206,16 @@ class ExternalAgentTools(
         )
         content?.take(MAX_CONTENT)?.let { data["content"] = it }
         data.putAll(extraData)
+        logger.info(
+            "[ExternalAgentSupervisorTool] emit subagent_event: threadId={}, configId={}, eventType={}, " +
+                "isLast={}, content={}, extra={}",
+            sinkInfo.threadId,
+            configId,
+            eventType,
+            isLast,
+            summarizeContent(content),
+            summarizeExtraData(extraData)
+        )
         sinkInfo.sink.tryEmitNext(
             AguiEvent.Custom(
                 sinkInfo.threadId,
@@ -310,5 +329,53 @@ class ExternalAgentTools(
         private const val DEFAULT_REASONING_PLACEHOLDER = "正在思考..."
         private val REASONING_EVENT_KEYWORDS = listOf("REASON", "THINK")
         private val REASONING_PLACEHOLDER_TOKENS = listOf("正在思考", "思考中")
+
+        private fun summarizeExternalEvent(event: ExternalAgentEvent): String {
+            return when (event) {
+                is ExternalAgentEvent.TextDelta ->
+                    "delta=${summarizeContent(event.delta)}"
+
+                is ExternalAgentEvent.ConversationId ->
+                    "conversationId=${event.conversationId}"
+
+                is ExternalAgentEvent.Custom ->
+                    "eventType=${event.eventType}, content=${summarizeContent(extractSummaryContent(event.data))}"
+
+                is ExternalAgentEvent.Error ->
+                    "category=${event.category}, message=${summarizeContent(event.message)}"
+
+                ExternalAgentEvent.Done -> "done"
+            }
+        }
+
+        private fun extractSummaryContent(data: Map<String, Any?>): String? {
+            val rawEvent = data["rawEvent"] as? Map<*, *>
+            return listOf(
+                data["delta"]?.toString(),
+                data["content"]?.toString(),
+                data["text"]?.toString(),
+                rawEvent?.get("content")?.toString(),
+                rawEvent?.get("text")?.toString()
+            ).firstOrNull { !it.isNullOrBlank() }
+        }
+
+        private fun summarizeContent(content: String?): String {
+            if (content.isNullOrBlank()) {
+                return "-"
+            }
+            val normalized = content.replace(Regex("\\s+"), " ").trim()
+            return if (normalized.length <= 120) {
+                normalized
+            } else {
+                normalized.take(120) + "...(truncated)"
+            }
+        }
+
+        private fun summarizeExtraData(extraData: Map<String, Any?>): String {
+            if (extraData.isEmpty()) {
+                return "-"
+            }
+            return extraData.entries.joinToString(",") { "${it.key}=${it.value}" }
+        }
     }
 }
