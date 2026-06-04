@@ -37,13 +37,12 @@ class ExternalAgentGateway @Autowired constructor(
 
         val config = externalAgentService.getEnabled(userId = userId, configId = configId)
         val platform = config.platform.uppercase()
-        val adapter = adapterMap[platform]
-            ?: return Flux.error(
-                ExternalAgentGatewayException(
-                    category = ExternalAgentErrorCategory.UNSUPPORTED_PLATFORM,
-                    message = "暂不支持该外部智能体平台"
-                )
+        val adapter = adapterMap[platform] ?: return Flux.error(
+            ExternalAgentGatewayException(
+                category = ExternalAgentErrorCategory.UNSUPPORTED_PLATFORM,
+                message = "暂不支持该外部智能体平台"
             )
+        )
 
         logger.info(
             "[ExternalAgentGateway] stream start: userId={}, configId={}, platform={}, threadId={}, runId={}",
@@ -83,7 +82,7 @@ class ExternalAgentGateway @Autowired constructor(
             .doOnCancel {
                 logger.info(
                     "[ExternalAgentGateway] stream cancelled: userId={}, configId={}, platform={}, " +
-                        "threadId={}, runId={}, totalMs={}, size={}, category={}",
+                            "threadId={}, runId={}, totalMs={}, size={}, category={}",
                     userId,
                     configId,
                     config.platform,
@@ -101,7 +100,7 @@ class ExternalAgentGateway @Autowired constructor(
                 if (responseChars.get() == 0) {
                     logger.warn(
                         "[ExternalAgentGateway] stream completed without text delta: userId={}, configId={}, " +
-                            "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
+                                "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
                         userId,
                         configId,
                         config.platform,
@@ -114,7 +113,7 @@ class ExternalAgentGateway @Autowired constructor(
                 }
                 logger.info(
                     "[ExternalAgentGateway] stream complete: userId={}, configId={}, platform={}, " +
-                        "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
+                            "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
                     userId,
                     configId,
                     config.platform,
@@ -146,7 +145,7 @@ class ExternalAgentGateway @Autowired constructor(
                     ?: ExternalAgentErrorCategory.UPSTREAM_ERROR
                 logger.warn(
                     "[ExternalAgentGateway] stream failed: userId={}, configId={}, platform={}, " +
-                        "threadId={}, runId={}, totalMs={}, size={}, category={}, error={}",
+                            "threadId={}, runId={}, totalMs={}, size={}, category={}, error={}",
                     userId,
                     configId,
                     config.platform,
@@ -173,7 +172,7 @@ class ExternalAgentGateway @Autowired constructor(
         }
         logger.info(
             "[ExternalAgentGateway] first token: userId={}, configId={}, platform={}, " +
-                "threadId={}, runId={}, firstTokenMs={}",
+                    "threadId={}, runId={}, firstTokenMs={}",
             userId,
             configId,
             platform,
