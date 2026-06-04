@@ -69,7 +69,8 @@ class ParamFacadeService @Autowired constructor(
         userId: String?,
         projectId: String,
         pipelineId: String?,
-        params: List<BuildFormProperty>
+        params: List<BuildFormProperty>,
+        channelCode: ChannelCode = ChannelCode.getRequestChannelCode()
     ): List<BuildFormProperty> {
         val filterParams = mutableListOf<BuildFormProperty>()
         params.forEach {
@@ -86,7 +87,15 @@ class ParamFacadeService @Autowired constructor(
             } else if (it.type == BuildFormPropertyType.ARTIFACTORY) {
                 filterParams.add(addArtifactoryProperties(userId, projectId, it))
             } else if (it.type == BuildFormPropertyType.SUB_PIPELINE) {
-                filterParams.add(addSubPipelineProperties(userId, projectId, pipelineId, it))
+                filterParams.add(
+                    addSubPipelineProperties(
+                        userId = userId,
+                        projectId = projectId,
+                        pipelineId = pipelineId,
+                        subPipelineFormProperty = it,
+                        channelCode = channelCode
+                    )
+                )
             } else if (it.type == BuildFormPropertyType.REPO_REF) {
                 filterParams.add(addRepoRefs(projectId, it))
             } else if (it.type == BuildFormPropertyType.FORM_LIST) {
