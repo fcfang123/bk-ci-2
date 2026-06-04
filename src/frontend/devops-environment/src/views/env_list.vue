@@ -53,7 +53,9 @@
                     prop="envType"
                 >
                     <template slot-scope="props">
-                        <span>{{ $t(`environment.envInfo.${props.row.envType}EnvType`) }}</span>
+                        <span v-if="props.row.envType === 'DEV'">{{ $t('environment.envInfo.devEnvType') }}</span>
+                        <span v-if="props.row.envType === 'PROD'">{{ $t('environment.envInfo.testEnvType') }}</span>
+                        <span v-if="props.row.envType === 'BUILD'">{{ $t('environment.envInfo.buildEnvType') }}</span>
                     </template>
                 </bk-table-column>
                 <bk-table-column
@@ -125,9 +127,9 @@
 </template>
 
 <script>
-    import { ENV_RESOURCE_ACTION, ENV_RESOURCE_TYPE } from '@/utils/permission'
-    import { convertTime } from '@/utils/util'
     import emptyNode from './empty_node'
+    import { convertTime } from '@/utils/util'
+    import { ENV_RESOURCE_ACTION, ENV_RESOURCE_TYPE } from '@/utils/permission'
     import EmptyTableStatus from '@/components/empty-table-status'
     import SearchSelect from '@blueking/search-select'
     import '@blueking/search-select/dist/styles/index.css'
@@ -173,19 +175,15 @@
                         children: [
                             {
                                 id: 'DEV',
-                                name: this.$t('environment.envInfo.DEVEnvType')
+                                name: this.$t('environment.envInfo.devEnvType')
                             },
                             {
                                 id: 'PROD',
-                                name: this.$t('environment.envInfo.PRODEnvType')
-                            },
-                            {
-                                id: 'DEVX',
-                                name: this.$t('environment.envInfo.DEVXEnvType')
+                                name: this.$t('environment.envInfo.testEnvType')
                             },
                             {
                                 id: 'BUILD',
-                                name: this.$t('environment.envInfo.BUILDEnvType')
+                                name: this.$t('environment.envInfo.buildEnvType')
                             }
                         ]
                     },
@@ -329,21 +327,6 @@
              */
             localConvertTime (timestamp) {
                 return convertTime(timestamp * 1000)
-            },
-
-            askEnvDeletePermission (id, name) {
-                this.$showAskPermissionDialog({
-                    noPermissionList: [{
-                        actionId: this.$permissionActionMap.delete,
-                        resourceId: this.$permissionResourceMap.environment,
-                        instanceId: [{
-                            id,
-                            name
-                        }],
-                        projectId: this.projectId
-                    }],
-                    applyPermissionUrl: `/backend/api/perm/apply/subsystem/?client_id=environment&project_code=${this.projectId}&service_code=environment&role_creator=environment`
-                })
             },
             clearFilter () {
                 this.searchValue = []

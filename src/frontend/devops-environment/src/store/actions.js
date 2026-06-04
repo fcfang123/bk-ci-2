@@ -101,9 +101,9 @@ const actions = {
     /**
      * 节点标签列表
      */
-    async requestNodeTagList ({ commit }, projectId) {
+    async requestNodeTagList ({ commit }, { projectId, createMode = false }) {
         try {
-            const res = await vue.$ajax.get(`${prefix}/user/nodetag/fetchTag?projectId=${projectId}`)
+            const res = await vue.$ajax.get(`${prefix}/user/nodetag/fetchTag?projectId=${projectId}&createMode=${createMode}`)
             commit('setNodeTagList', res || [])
             return res
         } catch (err) {
@@ -142,14 +142,6 @@ const actions = {
     },
     batchEditTag ({ commit }, { projectId, params }) {
         return vue.$ajax.post(`${prefix}/user/nodetag/batchEditTag?projectId=${projectId}`, params).then(response => {
-            return response
-        })
-    },
-    /**
-     * 环境的节点列表
-     */
-    requestEnvNodeList ({ commit }, { projectId, envHashId, params }) {
-        return vue.$ajax.get(`${prefix}/user/environment/${projectId}/${envHashId}/listNodesNew`, { params }).then(response => {
             return response
         })
     },
@@ -439,10 +431,8 @@ const actions = {
             console.log(error)
         }
     },
-    requestShareEnvProjectList (_, { projectId, envHashId, ...query }) {
-        return vue.$ajax.get(`${prefix}/user/environment/${projectId}/${envHashId}/list`, {
-            params: query
-        })
+    requestShareEnvProjectList (_, { projectId, envHashId, params }) {
+        return vue.$ajax.get(`${prefix}/user/environment/${projectId}/${envHashId}/list`, { params })
     },
 
     requestProjects (_, { projectId, envHashId, page, pageSize, search }) {
