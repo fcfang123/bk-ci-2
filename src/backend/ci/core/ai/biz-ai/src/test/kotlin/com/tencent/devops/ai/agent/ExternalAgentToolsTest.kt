@@ -138,6 +138,55 @@ class ExternalAgentToolsTest {
     }
 
     @Test
+    fun `callExternalAgent should map thinking custom event to reasoning progress`() {
+        val sessionContext = AgentSessionContext()
+        val sink = Sinks.many().multicast().onBackpressureBuffer<AguiEvent>()
+        val emittedEvents = mutableListOf<AguiEvent>()
+        sink.asFlux().subscribe { emittedEvents.add(it) }
+        sessionContext.registerSink(
+            mockk<Agent>(),
+            AgentSessionContext.SinkInfo(
+                sink = sink,
+                threadId = THREAD_ID,
+                runId = RUN_ID
+            )
+        )
+        every {
+            externalAgentService.resolveEnabledConfigId(USER_ID, CONFIG_ID)
+        } returns CONFIG_ID
+        every {
+            externalAgentService.getEnabled(USER_ID, CONFIG_ID)
+        } returns enabledAgentInfo()
+        every {
+            gateway.stream(
+                userId = USER_ID,
+                configId = CONFIG_ID,
+                input = any<ExternalAgentInput>()
+            )
+        } returns Flux.just(
+            ExternalAgentEvent.Custom(
+                eventType = "THINKING_TEXT_MESSAGE_CONTENT",
+                data = mapOf("content" to "用户")
+            ),
+            ExternalAgentEvent.Done
+        )
+        val tools = createTools(sessionContext = sessionContext, threadId = THREAD_ID)
+
+        tools.callExternalAgent(
+            configId = CONFIG_ID,
+            query = "think"
+        )
+
+        assertEquals(2, emittedEvents.size)
+        val progressEvent = emittedEvents[0] as? AguiEvent.Custom
+        val progressData = progressEvent?.value as? Map<*, *>
+        assertEquals("REASONING", progressData?.get("eventType"))
+        assertEquals("用户", progressData?.get("content"))
+        assertEquals("THINKING_TEXT_MESSAGE_CONTENT", progressData?.get("externalEventType"))
+        assertEquals(false, progressData?.get("isLast"))
+    }
+
+    @Test
     fun `callExternalAgent should fail when same name is ambiguous`() {
         every {
             externalAgentService.resolveEnabledConfigId(USER_ID, AGENT_NAME)

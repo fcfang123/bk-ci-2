@@ -136,6 +136,33 @@ class ExternalAgentSseEventParserTest {
     }
 
     @Test
+    fun `BkAiDev parser should ignore text message end event`() {
+        val chunk = """{"type":"TEXT_MESSAGE_END"}"""
+
+        val events = ExternalAgentSseEventParser.parseBkAiDev(chunk)
+
+        assertEquals(emptyList<ExternalAgentEvent>(), events)
+    }
+
+    @Test
+    fun `Knot parser should ignore text message end event`() {
+        val chunk = """{"type":"TEXT_MESSAGE_END"}"""
+
+        val events = ExternalAgentSseEventParser.parseKnot(chunk)
+
+        assertEquals(emptyList<ExternalAgentEvent>(), events)
+    }
+
+    @Test
+    fun `Knot parser should only mark run finished as done`() {
+        val chunk = """{"type":"RUN_FINISHED"}"""
+
+        val events = ExternalAgentSseEventParser.parseKnot(chunk)
+
+        assertEquals(listOf(ExternalAgentEvent.Done), events)
+    }
+
+    @Test
     fun `parser should return parse error for malformed data event`() {
         val events = ExternalAgentSseEventParser.parseBkAiDev("data: {broken")
 

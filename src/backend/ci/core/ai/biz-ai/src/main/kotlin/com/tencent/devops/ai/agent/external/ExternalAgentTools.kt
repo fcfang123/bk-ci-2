@@ -211,7 +211,7 @@ class ExternalAgentTools(
         event: ExternalAgentEvent.Custom,
         conversationId: String?
     ) {
-        val mappedEventType = if (event.eventType.contains(REASONING_KEYWORD, ignoreCase = true)) {
+        val mappedEventType = if (isReasoningEventType(event.eventType)) {
             EVENT_TYPE_REASONING
         } else {
             EVENT_TYPE_ASSISTANT
@@ -238,12 +238,18 @@ class ExternalAgentTools(
         ).firstOrNull { !it.isNullOrBlank() }?.take(MAX_CONTENT)
     }
 
+    private fun isReasoningEventType(eventType: String): Boolean {
+        return REASONING_EVENT_KEYWORDS.any { keyword ->
+            eventType.contains(keyword, ignoreCase = true)
+        }
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger(ExternalAgentTools::class.java)
         private const val CUSTOM_EVENT_NAME = "subagent_event"
         private const val EVENT_TYPE_ASSISTANT = "ASSISTANT"
         private const val EVENT_TYPE_REASONING = "REASONING"
         private const val MAX_CONTENT = 2000
-        private const val REASONING_KEYWORD = "REASON"
+        private val REASONING_EVENT_KEYWORDS = listOf("REASON", "THINK")
     }
 }

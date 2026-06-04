@@ -32,7 +32,8 @@ object ExternalAgentSseEventParser {
                             }
                         )
                     }
-                    "TEXT_MESSAGE_END", "RUN_FINISHED", "done" -> listOf(ExternalAgentEvent.Done)
+                    "TEXT_MESSAGE_END" -> emptyList()
+                    "RUN_FINISHED", "done" -> listOf(ExternalAgentEvent.Done)
                     "error", "RUN_ERROR" -> listOf(upstreamError(event["message"]?.toString()))
                     else -> event.toCustom(type ?: "UNKNOWN")
                 }
@@ -57,7 +58,8 @@ object ExternalAgentSseEventParser {
                             conversationId?.takeIf { it.isNotBlank() }?.let { ExternalAgentEvent.ConversationId(it) }
                         )
                     }
-                    "TEXT_MESSAGE_END", "RUN_FINISHED", "done" -> listOf(ExternalAgentEvent.Done)
+                    "TEXT_MESSAGE_END" -> emptyList()
+                    "RUN_FINISHED", "done" -> listOf(ExternalAgentEvent.Done)
                     "error", "RUN_ERROR" -> listOf(upstreamError(event["message"]?.toString()))
                     else -> event.toCustom(type ?: "UNKNOWN")
                 }
