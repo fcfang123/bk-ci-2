@@ -15,7 +15,7 @@ class ExternalAgentAdapterValidationTest {
         val error = assertThrows(ExternalAgentGatewayException::class.java) {
             BkAiDevExternalAgentAdapter().validateConfig(
                 ExternalAgentConfigValidationContext(
-                    platform = BkAiDevExternalAgentAdapter.PLATFORM,
+                    platform = "BKAIDEV",
                     agentId = "agent-id",
                     apiUrl = "https://example.com/prod/invoke/plugin",
                     headers = """{"X-Bkapi-Authorization":"{\"access_token\":\"token\"}"}"""
@@ -31,7 +31,7 @@ class ExternalAgentAdapterValidationTest {
         assertDoesNotThrow {
             BkAiDevExternalAgentAdapter().validateConfig(
                 ExternalAgentConfigValidationContext(
-                    platform = BkAiDevExternalAgentAdapter.PLATFORM,
+                    platform = "BKAIDEV",
                     agentId = "agent-id",
                     apiUrl = "https://example.com/chat_completion",
                     headers = """{"X-Bkapi-Authorization":"{\"access_token\":\"token\"}"}"""
@@ -45,7 +45,7 @@ class ExternalAgentAdapterValidationTest {
         val error = assertThrows(ExternalAgentGatewayException::class.java) {
             KnotExternalAgentAdapter().validateConfig(
                 ExternalAgentConfigValidationContext(
-                    platform = KnotExternalAgentAdapter.PLATFORM,
+                    platform = "KNOT",
                     agentId = "agent-id",
                     apiUrl = "https://example.com/api/v1/agents/plain/agent-id",
                     headers = """{"x-knot-api-token":"token","x-knot-api-user":"tester"}"""
@@ -61,7 +61,7 @@ class ExternalAgentAdapterValidationTest {
         assertDoesNotThrow {
             KnotExternalAgentAdapter().validateConfig(
                 ExternalAgentConfigValidationContext(
-                    platform = KnotExternalAgentAdapter.PLATFORM,
+                    platform = "KNOT",
                     agentId = "agent-id",
                     apiUrl = "https://example.com/apigw/api/v1/agents/agui/agent-id",
                     headers = """{"x-knot-api-token":"token","x-knot-api-user":"tester"}"""
