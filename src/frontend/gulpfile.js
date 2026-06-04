@@ -197,7 +197,7 @@ async function execAsync () {
     
     return new Promise((resolve, reject) => {
         const scopeStr = getScopeStr(scope)
-        const cmd = effect ? 'affected -t public:master' : `run-many -t public:master ${scopeStr}`
+        const cmd = `run-many -t public:master`
         console.log('gulp cmd: ', cmd, cmd.split(' '))
         const { spawn } = require('node:child_process')
         const spawnCmd = spawn('pnpm', [
