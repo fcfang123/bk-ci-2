@@ -412,12 +412,14 @@ class ExternalAgentService @Autowired constructor(
                 mapOf(
                     BKAIDEV_BK_APP_CODE_KEY to authConfig.bkAppCode,
                     BKAIDEV_BK_APP_SECRET_KEY to authConfig.bkAppSecret
-                ).filterValues { !it.isNullOrBlank() }
+                ).filterValues { !it.isNullOrBlank() },
+                false
             )
 
             effectiveAuthMode == ExternalAgentAuthMode.USER -> JsonUtil.toJson(
                 mapOf(BKAIDEV_ACCESS_TOKEN_KEY to authConfig.accessToken)
-                    .filterValues { !it.isNullOrBlank() }
+                    .filterValues { !it.isNullOrBlank() },
+                false
             )
 
             else -> null

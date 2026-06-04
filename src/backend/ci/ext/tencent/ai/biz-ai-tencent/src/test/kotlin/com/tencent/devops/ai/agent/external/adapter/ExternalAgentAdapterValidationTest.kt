@@ -4,6 +4,7 @@ import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
 import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
 import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.pojo.ExternalAgentPlatform
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -113,5 +114,19 @@ class ExternalAgentAdapterValidationTest {
         assertTrue(summary.contains("uri=https://example.com/chat_completion"))
         assertTrue(summary.contains("causeType=IOException"))
         assertTrue(summary.contains("causeMessage=Connection refused"))
+    }
+
+    @Test
+    fun `BkAiDev should sanitize multiline auth header before request`() {
+        val sanitized = BkAiDevExternalAgentAdapter.sanitizeHeaders(
+            mapOf(
+                "X-Bkapi-Authorization" to "{\n  \"access_token\" : \"token\"\n}",
+                "X-BKAIDEV-USER" to " tester \n"
+            )
+        )
+
+        assertEquals("""{"access_token":"token"}""", sanitized["X-Bkapi-Authorization"])
+        assertEquals("tester", sanitized["X-BKAIDEV-USER"])
+        assertFalse(sanitized["X-Bkapi-Authorization"]!!.contains('\n'))
     }
 }
