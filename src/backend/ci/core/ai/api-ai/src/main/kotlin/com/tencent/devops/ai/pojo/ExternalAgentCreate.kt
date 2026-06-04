@@ -37,8 +37,12 @@ data class ExternalAgentCreate(
     val description: String,
     @get:Schema(title = "平台类型", required = true)
     val platform: ExternalAgentPlatform,
-    @get:Schema(title = "平台上的Agent ID", required = true)
-    val agentId: String,
+    @get:Schema(
+        title = "平台上的Agent ID",
+        description = "KNOT 可从 apiUrl 最后一段自动提取，BKAIDEV 未传时默认使用 agentName",
+        required = false
+    )
+    val agentId: String? = null,
     @get:Schema(title = "API端点URL", required = true)
     val apiUrl: String,
     @get:Schema(

@@ -52,6 +52,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.ZoneOffset
+import java.net.URI
 
 /**
  * 外部智能体配置管理服务，支持对接第三方智能体平台（如 Knot）。
@@ -77,6 +78,12 @@ class ExternalAgentService @Autowired constructor(
     ): ExternalAgentInfo {
         val id = UUIDUtil.generate()
         val platform = request.platform
+        val effectiveAgentId = resolveAgentId(
+            platform = platform,
+            rawAgentId = request.agentId,
+            agentName = request.agentName,
+            apiUrl = request.apiUrl
+        )
         val assembledHeaders = resolveHeaders(
             userId = userId,
             platform = platform,
@@ -85,7 +92,7 @@ class ExternalAgentService @Autowired constructor(
         )
         validateConfig(
             platform = platform.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId,
             apiUrl = request.apiUrl,
             headers = assembledHeaders
         )
@@ -101,7 +108,7 @@ class ExternalAgentService @Autowired constructor(
             agentName = request.agentName,
             description = request.description,
             platform = platform.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId,
             apiUrl = request.apiUrl,
             headers = encryptHeaders(assembledHeaders),
             enabled = request.enabled
@@ -188,6 +195,18 @@ class ExternalAgentService @Autowired constructor(
         val record = getOwnedRecord(userId, configId)
         val currentHeaders = decryptHeaders(record.headers)
         val effectivePlatform = request.platform ?: ExternalAgentPlatform.fromValue(record.platform)
+        val effectiveAgentName = request.agentName ?: record.agentName
+        val effectiveApiUrl = request.apiUrl ?: record.apiUrl
+        val effectiveAgentId = if (shouldRecalculateAgentId(effectivePlatform, request)) {
+            resolveAgentId(
+                platform = effectivePlatform,
+                rawAgentId = request.agentId ?: record.agentId,
+                agentName = effectiveAgentName,
+                apiUrl = effectiveApiUrl
+            )
+        } else {
+            record.agentId
+        }
         val effectiveHeaders = resolveEffectiveHeaders(
             userId = userId,
             platform = effectivePlatform,
@@ -197,8 +216,8 @@ class ExternalAgentService @Autowired constructor(
         )
         validateConfig(
             platform = effectivePlatform.name,
-            agentId = request.agentId ?: record.agentId,
-            apiUrl = request.apiUrl ?: record.apiUrl,
+            agentId = effectiveAgentId,
+            apiUrl = effectiveApiUrl,
             headers = effectiveHeaders
         )
         return dao.update(
@@ -207,7 +226,7 @@ class ExternalAgentService @Autowired constructor(
             agentName = request.agentName,
             description = request.description,
             platform = request.platform?.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId.takeIf { it != record.agentId },
             apiUrl = request.apiUrl,
             headers = resolveUpdatedEncryptedHeaders(
                 userId = userId,
@@ -395,6 +414,43 @@ class ExternalAgentService @Autowired constructor(
             }
 
             else -> resolveEncryptedHeaders(rawHeaders)
+        }
+    }
+
+    private fun resolveAgentId(
+        platform: ExternalAgentPlatform,
+        rawAgentId: String?,
+        agentName: String,
+        apiUrl: String
+    ): String {
+        return when (platform) {
+            ExternalAgentPlatform.KNOT -> extractKnotAgentId(apiUrl)
+                ?: rawAgentId?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw invalidConfig("KNOT 平台无法从 apiUrl 中提取 agentId")
+
+            ExternalAgentPlatform.BKAIDEV -> rawAgentId?.trim()?.takeIf { it.isNotBlank() }
+                ?: agentName.trim().takeIf { it.isNotBlank() }
+                ?: throw invalidConfig("BKAIDEV 平台 agentName 不能为空")
+        }
+    }
+
+    private fun extractKnotAgentId(apiUrl: String): String? {
+        return runCatching { URI(apiUrl) }.getOrNull()
+            ?.path
+            ?.split("/")
+            ?.lastOrNull { it.isNotBlank() }
+    }
+
+    private fun shouldRecalculateAgentId(
+        platform: ExternalAgentPlatform,
+        request: ExternalAgentUpdate
+    ): Boolean {
+        return when (platform) {
+            ExternalAgentPlatform.KNOT ->
+                request.platform != null || request.apiUrl != null || request.agentId != null
+
+            ExternalAgentPlatform.BKAIDEV ->
+                request.platform != null || request.agentId != null || request.agentName != null
         }
     }
 
