@@ -18,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.jooq.DSLContext
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -236,6 +237,7 @@ class ExternalAgentServiceTest {
         assertEquals(ExternalAgentAuthMode.USER, authConfig.authMode)
         assertEquals(MASKED_HEADER_VALUE, authConfig.accessToken)
         assertEquals(mapOf("access_token" to "token"), authHeader)
+        assertFalse(parsedHeaders["X-Bkapi-Authorization"]!!.contains('\n'))
     }
 
     @Test
@@ -296,6 +298,7 @@ class ExternalAgentServiceTest {
                 object : TypeReference<Map<String, String>>() {}
             )
         )
+        assertFalse(parsedHeaders["X-Bkapi-Authorization"]!!.contains('\n'))
     }
 
     @Test

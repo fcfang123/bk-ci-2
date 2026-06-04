@@ -10,6 +10,7 @@ import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.service.AiMcpServerService
+import com.tencent.devops.common.api.util.JsonUtil
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
@@ -49,7 +50,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
 
     override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
         val config = request.config
-        val headers = AiMcpServerService.parseHeaders(config.headers)
+        val headers = sanitizeHeaders(AiMcpServerService.parseHeaders(config.headers))
         val executeKwargs = mutableMapOf<String, Any>("stream" to true)
         if (request.conversationId.isNotBlank()) {
             executeKwargs["thread_id"] = request.conversationId
@@ -144,6 +145,31 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
                     "message=$message, causeType=$causeType, causeMessage=$causeMessage"
                 }
             }
+        }
+
+        internal fun sanitizeHeaders(headers: Map<String, String>): Map<String, String> {
+            return headers.mapValues { (key, value) ->
+                when (key) {
+                    HEADER_BKAPI_AUTHORIZATION -> sanitizeBkapiAuthorization(value)
+                    else -> sanitizeHeaderValue(value)
+                }
+            }
+        }
+
+        private fun sanitizeBkapiAuthorization(value: String): String {
+            val normalized = sanitizeHeaderValue(value)
+            return try {
+                JsonUtil.toJson(
+                    JsonUtil.to<Map<String, Any>>(normalized),
+                    false
+                )
+            } catch (ignored: Exception) {
+                normalized
+            }
+        }
+
+        private fun sanitizeHeaderValue(value: String): String {
+            return value.replace(Regex("[\\r\\n]+"), "").trim()
         }
 
         private fun sanitizeForLog(message: String?): String {
