@@ -37,7 +37,9 @@ import com.tencent.devops.ai.pojo.ExternalAgentAuthConfig
 import com.tencent.devops.ai.pojo.ExternalAgentAuthMode
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.pojo.ExternalAgentMetadata
 import com.tencent.devops.ai.pojo.ExternalAgentPlatform
+import com.tencent.devops.ai.pojo.ExternalAgentPlatformConfigInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.util.AESUtil
@@ -65,6 +67,10 @@ class ExternalAgentService @Autowired constructor(
 
     private val adapterMap = adapters.associateBy { it.platform() }
 
+    fun listPlatformConfigs(): List<ExternalAgentPlatformConfigInfo> {
+        return ExternalAgentMetadata.listPlatformConfigInfos()
+    }
+
     fun create(
         userId: String,
         request: ExternalAgentCreate
@@ -72,6 +78,7 @@ class ExternalAgentService @Autowired constructor(
         val id = UUIDUtil.generate()
         val platform = request.platform
         val assembledHeaders = resolveHeaders(
+            userId = userId,
             platform = platform,
             headers = request.headers,
             authConfig = request.authConfig
@@ -182,6 +189,7 @@ class ExternalAgentService @Autowired constructor(
         val currentHeaders = decryptHeaders(record.headers)
         val effectivePlatform = request.platform ?: ExternalAgentPlatform.fromValue(record.platform)
         val effectiveHeaders = resolveEffectiveHeaders(
+            userId = userId,
             platform = effectivePlatform,
             currentHeaders = currentHeaders,
             rawHeaders = request.headers,
@@ -202,6 +210,7 @@ class ExternalAgentService @Autowired constructor(
             agentId = request.agentId,
             apiUrl = request.apiUrl,
             headers = resolveUpdatedEncryptedHeaders(
+                userId = userId,
                 platform = effectivePlatform,
                 currentHeaders = currentHeaders,
                 rawHeaders = request.headers,
@@ -295,7 +304,7 @@ class ExternalAgentService @Autowired constructor(
             platform = platform,
             agentId = record.agentId,
             apiUrl = record.apiUrl,
-            authConfig = if (maskHeaders) maskAuthConfig(authConfig) else authConfig,
+            authConfig = if (maskHeaders) maskAuthConfig(platform, authConfig) else authConfig,
             headers = if (maskHeaders) maskHeaderValues(decryptedHeaders) else decryptedHeaders,
             enabled = record.enabled,
             createdTime = record.createdTime
@@ -344,14 +353,16 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun resolveHeaders(
+        userId: String,
         platform: ExternalAgentPlatform,
         headers: String?,
         authConfig: ExternalAgentAuthConfig?
     ): String? {
-        return authConfig?.let { buildHeaders(platform, it) } ?: headers
+        return authConfig?.let { buildHeaders(userId, platform, it) } ?: headers
     }
 
     private fun resolveEffectiveHeaders(
+        userId: String,
         platform: ExternalAgentPlatform,
         currentHeaders: String?,
         rawHeaders: String?,
@@ -360,7 +371,7 @@ class ExternalAgentService @Autowired constructor(
         return when {
             authConfig != null -> {
                 val existingAuthConfig = parseAuthConfig(platform, currentHeaders)
-                buildHeaders(platform, mergeAuthConfig(existingAuthConfig, authConfig))
+                buildHeaders(userId, platform, mergeAuthConfig(existingAuthConfig, authConfig))
             }
 
             rawHeaders != null -> rawHeaders
@@ -369,6 +380,7 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun resolveUpdatedEncryptedHeaders(
+        userId: String,
         platform: ExternalAgentPlatform,
         currentHeaders: String?,
         rawHeaders: String?,
@@ -377,7 +389,9 @@ class ExternalAgentService @Autowired constructor(
         return when {
             authConfig != null -> {
                 val existingAuthConfig = parseAuthConfig(platform, currentHeaders)
-                resolveEncryptedHeaders(buildHeaders(platform, mergeAuthConfig(existingAuthConfig, authConfig)))
+                resolveEncryptedHeaders(
+                    buildHeaders(userId, platform, mergeAuthConfig(existingAuthConfig, authConfig))
+                )
             }
 
             else -> resolveEncryptedHeaders(rawHeaders)
@@ -385,58 +399,33 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun buildHeaders(
+        userId: String,
         platform: ExternalAgentPlatform,
         authConfig: ExternalAgentAuthConfig
     ): String? {
-        val headers = when (platform) {
-            ExternalAgentPlatform.BKAIDEV -> buildBkAiDevHeaders(authConfig)
-            ExternalAgentPlatform.KNOT -> buildKnotHeaders(authConfig)
+        val definition = ExternalAgentMetadata.getDefinition(platform)
+        val headers = linkedMapOf<String, String>()
+        val bkapiAuthorizationPayload = linkedMapOf<String, String>()
+        definition.authFields
+            .filter { it.authModes.isEmpty() || authConfig.authMode == null || authConfig.authMode in it.authModes }
+            .forEach { field ->
+                val value = resolveAuthFieldValue(userId, field, authConfig.values)
+                if (value.isBlank()) {
+                    return@forEach
+                }
+                when (val target = field.target) {
+                    is ExternalAgentMetadata.AuthFieldTarget.Header -> headers[target.headerName] = value
+                    is ExternalAgentMetadata.AuthFieldTarget.BkapiAuthorization ->
+                        bkapiAuthorizationPayload[target.payloadKey] = value
+                }
+            }
+        if (bkapiAuthorizationPayload.isNotEmpty()) {
+            headers[BKAIDEV_AUTHORIZATION_HEADER] = JsonUtil.toJson(bkapiAuthorizationPayload, false)
         }
         return if (headers.isEmpty()) {
             null
         } else {
             JsonUtil.toJson(headers)
-        }
-    }
-
-    private fun buildBkAiDevHeaders(authConfig: ExternalAgentAuthConfig): Map<String, String> {
-        val effectiveAuthMode = when {
-            authConfig.authMode != null -> authConfig.authMode
-            !authConfig.accessToken.isNullOrBlank() -> ExternalAgentAuthMode.USER
-            !authConfig.bkAppCode.isNullOrBlank() || !authConfig.bkAppSecret.isNullOrBlank() ->
-                ExternalAgentAuthMode.APP
-            else -> null
-        }
-        val authorization = when {
-            effectiveAuthMode == ExternalAgentAuthMode.APP -> JsonUtil.toJson(
-                mapOf(
-                    BKAIDEV_BK_APP_CODE_KEY to authConfig.bkAppCode,
-                    BKAIDEV_BK_APP_SECRET_KEY to authConfig.bkAppSecret
-                ).filterValues { !it.isNullOrBlank() },
-                false
-            )
-
-            effectiveAuthMode == ExternalAgentAuthMode.USER -> JsonUtil.toJson(
-                mapOf(BKAIDEV_ACCESS_TOKEN_KEY to authConfig.accessToken)
-                    .filterValues { !it.isNullOrBlank() },
-                false
-            )
-
-            else -> null
-        }
-        val headers = linkedMapOf<String, String>()
-        authorization?.let { headers[BKAIDEV_AUTHORIZATION_HEADER] = it }
-        val bkAiDevUser = authConfig.bkAiDevUser
-        if (effectiveAuthMode != ExternalAgentAuthMode.USER && !bkAiDevUser.isNullOrBlank()) {
-            headers[BKAIDEV_USER_HEADER] = bkAiDevUser
-        }
-        return headers
-    }
-
-    private fun buildKnotHeaders(authConfig: ExternalAgentAuthConfig): Map<String, String> {
-        return linkedMapOf<String, String>().apply {
-            authConfig.knotApiToken?.takeIf { it.isNotBlank() }?.let { put(KNOT_TOKEN_HEADER, it) }
-            authConfig.knotApiUser?.takeIf { it.isNotBlank() }?.let { put(KNOT_USER_HEADER, it) }
         }
     }
 
@@ -448,46 +437,27 @@ class ExternalAgentService @Autowired constructor(
         if (parsedHeaders.isEmpty()) {
             return null
         }
-        return when (platform) {
-            ExternalAgentPlatform.BKAIDEV -> parseBkAiDevAuthConfig(parsedHeaders)
-            ExternalAgentPlatform.KNOT -> parseKnotAuthConfig(parsedHeaders)
+        val definition = ExternalAgentMetadata.getDefinition(platform)
+        val bkapiAuthorizationPayload = parseJsonMap(getHeaderIgnoreCase(parsedHeaders, BKAIDEV_AUTHORIZATION_HEADER))
+        val values = linkedMapOf<String, String>()
+        definition.authFields.forEach { field ->
+            val value = when (val target = field.target) {
+                is ExternalAgentMetadata.AuthFieldTarget.Header ->
+                    getHeaderIgnoreCase(parsedHeaders, target.headerName)
+                is ExternalAgentMetadata.AuthFieldTarget.BkapiAuthorization ->
+                    bkapiAuthorizationPayload[target.payloadKey]
+            }
+            if (!field.autoFillCurrentUser && !value.isNullOrBlank()) {
+                values[field.key] = value
+            }
         }
-    }
-
-    private fun parseBkAiDevAuthConfig(headers: Map<String, String>): ExternalAgentAuthConfig? {
-        val authorization = getHeaderIgnoreCase(headers, BKAIDEV_AUTHORIZATION_HEADER)
-        val user = getHeaderIgnoreCase(headers, BKAIDEV_USER_HEADER)
-        val authPayload = parseJsonMap(authorization)
-        if (authorization.isNullOrBlank() && user.isNullOrBlank()) {
+        val authMode = resolveAuthMode(definition, parsedHeaders, bkapiAuthorizationPayload)
+        if (values.isEmpty() && authMode == null) {
             return null
-        }
-        val accessToken = authPayload[BKAIDEV_ACCESS_TOKEN_KEY]
-        val bkAppCode = authPayload[BKAIDEV_BK_APP_CODE_KEY]
-        val bkAppSecret = authPayload[BKAIDEV_BK_APP_SECRET_KEY]
-        val authMode = when {
-            !accessToken.isNullOrBlank() -> ExternalAgentAuthMode.USER
-            !bkAppCode.isNullOrBlank() || !bkAppSecret.isNullOrBlank() || !user.isNullOrBlank() ->
-                ExternalAgentAuthMode.APP
-            else -> null
         }
         return ExternalAgentAuthConfig(
             authMode = authMode,
-            bkAppCode = bkAppCode,
-            bkAppSecret = bkAppSecret,
-            accessToken = accessToken,
-            bkAiDevUser = user
-        )
-    }
-
-    private fun parseKnotAuthConfig(headers: Map<String, String>): ExternalAgentAuthConfig? {
-        val token = getHeaderIgnoreCase(headers, KNOT_TOKEN_HEADER)
-        val user = getHeaderIgnoreCase(headers, KNOT_USER_HEADER)
-        if (token.isNullOrBlank() && user.isNullOrBlank()) {
-            return null
-        }
-        return ExternalAgentAuthConfig(
-            knotApiToken = token,
-            knotApiUser = user
+            values = values
         )
     }
 
@@ -497,24 +467,62 @@ class ExternalAgentService @Autowired constructor(
     ): ExternalAgentAuthConfig {
         return ExternalAgentAuthConfig(
             authMode = incoming.authMode ?: current?.authMode,
-            bkAppCode = incoming.bkAppCode ?: current?.bkAppCode,
-            bkAppSecret = incoming.bkAppSecret ?: current?.bkAppSecret,
-            accessToken = incoming.accessToken ?: current?.accessToken,
-            bkAiDevUser = incoming.bkAiDevUser ?: current?.bkAiDevUser,
-            knotApiToken = incoming.knotApiToken ?: current?.knotApiToken,
-            knotApiUser = incoming.knotApiUser ?: current?.knotApiUser
+            values = current?.values.orEmpty() + incoming.values
         )
     }
 
-    private fun maskAuthConfig(authConfig: ExternalAgentAuthConfig?): ExternalAgentAuthConfig? {
+    private fun maskAuthConfig(
+        platform: ExternalAgentPlatform,
+        authConfig: ExternalAgentAuthConfig?
+    ): ExternalAgentAuthConfig? {
         if (authConfig == null) {
             return null
         }
+        val secretKeys = ExternalAgentMetadata.getDefinition(platform).authFields
+            .filter { it.secret && !it.autoFillCurrentUser }
+            .map { it.key }
+            .toSet()
         return authConfig.copy(
-            bkAppSecret = authConfig.bkAppSecret?.let { MASKED_HEADER_VALUE },
-            accessToken = authConfig.accessToken?.let { MASKED_HEADER_VALUE },
-            knotApiToken = authConfig.knotApiToken?.let { MASKED_HEADER_VALUE }
+            values = authConfig.values.mapValues { (key, value) ->
+                if (key in secretKeys) {
+                    MASKED_HEADER_VALUE
+                } else {
+                    value
+                }
+            }
         )
+    }
+
+    private fun resolveAuthFieldValue(
+        userId: String,
+        field: ExternalAgentMetadata.ExternalAgentAuthFieldDefinition,
+        values: Map<String, String>
+    ): String {
+        return if (field.autoFillCurrentUser) {
+            userId
+        } else {
+            values[field.key].orEmpty().trim()
+        }
+    }
+
+    private fun resolveAuthMode(
+        definition: ExternalAgentMetadata.ExternalAgentPlatformDefinition,
+        headers: Map<String, String>,
+        bkapiAuthorizationPayload: Map<String, String>
+    ): ExternalAgentAuthMode? {
+        return definition.authModes.firstOrNull { mode ->
+            definition.authFields
+                .filter { it.authModes.isEmpty() || mode in it.authModes }
+                .any { field ->
+                    val value = when (val target = field.target) {
+                        is ExternalAgentMetadata.AuthFieldTarget.Header ->
+                            getHeaderIgnoreCase(headers, target.headerName)
+                        is ExternalAgentMetadata.AuthFieldTarget.BkapiAuthorization ->
+                            bkapiAuthorizationPayload[target.payloadKey]
+                    }
+                    !value.isNullOrBlank()
+                }
+        }
     }
 
     private fun getHeaderIgnoreCase(
@@ -547,12 +555,6 @@ class ExternalAgentService @Autowired constructor(
     companion object {
         private const val MASKED_HEADER_VALUE = "******"
         private const val BKAIDEV_AUTHORIZATION_HEADER = "X-Bkapi-Authorization"
-        private const val BKAIDEV_USER_HEADER = "X-BKAIDEV-USER"
-        private const val BKAIDEV_ACCESS_TOKEN_KEY = "access_token"
-        private const val BKAIDEV_BK_APP_CODE_KEY = "bk_app_code"
-        private const val BKAIDEV_BK_APP_SECRET_KEY = "bk_app_secret"
-        private const val KNOT_TOKEN_HEADER = "x-knot-api-token"
-        private const val KNOT_USER_HEADER = "x-knot-api-user"
         private val logger = LoggerFactory.getLogger(
             ExternalAgentService::class.java
         )
