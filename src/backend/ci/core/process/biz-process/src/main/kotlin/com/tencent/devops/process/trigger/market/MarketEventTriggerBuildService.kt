@@ -206,8 +206,7 @@ class MarketEventTriggerBuildService @Autowired constructor(
         val triggerContainer = model.getTriggerContainer()
         // 传入的启动参数,替换成流水线默认值
         val variables = pipelineRepositoryService.getTriggerParams(
-            triggerContainer = triggerContainer,
-            inputParams = request.startParams
+            triggerContainer = triggerContainer
         )
         // 额外获取创作流的启动参数
         val extStartParam = resolveCreativeStreamParams(
