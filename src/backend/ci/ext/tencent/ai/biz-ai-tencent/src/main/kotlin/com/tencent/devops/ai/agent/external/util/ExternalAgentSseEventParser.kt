@@ -22,7 +22,7 @@ object ExternalAgentSseEventParser {
                     }
                     "text" -> {
                         val content = event["content"]?.toString()
-                        listOfNotNull(content?.takeIf { it.isNotEmpty() }?.let { ExternalAgentEvent.TextDelta(it) })
+                        mapLegacyBkAiDevTextEvent(content)
                     }
                     "RUN_STARTED" -> {
                         val threadId = event["threadId"]?.toString() ?: event["thread_id"]?.toString()
@@ -130,6 +130,32 @@ object ExternalAgentSseEventParser {
         )
     }
 
+    private fun mapLegacyBkAiDevTextEvent(content: String?): List<ExternalAgentEvent> {
+        val normalizedContent = content?.takeIf { it.isNotEmpty() } ?: return emptyList()
+        return if (isReasoningPlaceholderContent(normalizedContent)) {
+            listOf(
+                ExternalAgentEvent.Custom(
+                    eventType = LEGACY_BKAIDEV_REASONING_EVENT,
+                    data = mapOf("content" to DEFAULT_REASONING_PLACEHOLDER)
+                )
+            )
+        } else {
+            listOf(ExternalAgentEvent.TextDelta(normalizedContent))
+        }
+    }
+
+    private fun isReasoningPlaceholderContent(content: String): Boolean {
+        val normalized = content
+            .replace(Regex("\\s+"), "")
+            .replace(Regex("[.。,…，、!！?？~～:：;；·•\\-]+"), "")
+        if (normalized.isBlank()) {
+            return false
+        }
+        return REASONING_PLACEHOLDER_TOKENS.any { token ->
+            normalized.replace(token, "").isEmpty()
+        }
+    }
+
     private fun Map<String, Any?>.toCustom(type: String): List<ExternalAgentEvent> {
         return listOf(
             ExternalAgentEvent.Custom(
@@ -143,4 +169,7 @@ object ExternalAgentSseEventParser {
     private val objectMapper = jacksonObjectMapper()
     private val MAP_TYPE = object : TypeReference<Map<String, Any?>>() {}
     private const val DONE_SENTINEL = "[DONE]"
+    private const val LEGACY_BKAIDEV_REASONING_EVENT = "THINKING_TEXT_MESSAGE_CONTENT"
+    private const val DEFAULT_REASONING_PLACEHOLDER = "正在思考..."
+    private val REASONING_PLACEHOLDER_TOKENS = listOf("正在思考", "思考中")
 }

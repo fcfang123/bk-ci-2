@@ -43,6 +43,26 @@ class ExternalAgentSseEventParserTest {
     }
 
     @Test
+    fun `BkAiDev parser should convert legacy thinking text event to reasoning custom event`() {
+        val chunk = """
+            data: {"event":"text","content":"正在思考...正在思考..."}
+
+        """.trimIndent()
+
+        val events = ExternalAgentSseEventParser.parseBkAiDev(chunk)
+
+        assertEquals(
+            listOf(
+                ExternalAgentEvent.Custom(
+                    eventType = "THINKING_TEXT_MESSAGE_CONTENT",
+                    data = mapOf("content" to "正在思考...")
+                )
+            ),
+            events
+        )
+    }
+
+    @Test
     fun `BkAiDev parser should read thread id as conversation id`() {
         val chunk = """
             data: {"type":"RUN_STARTED","thread_id":"thread-1"}
