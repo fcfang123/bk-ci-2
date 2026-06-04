@@ -241,6 +241,96 @@ class ExternalAgentServiceTest {
     }
 
     @Test
+    fun `create should derive knot agentId from apiUrl`() {
+        var persistedAgentId: String? = null
+        every {
+            dao.create(
+                dslContext = dslContext,
+                id = any(),
+                userId = any(),
+                agentName = any(),
+                description = any(),
+                platform = any(),
+                agentId = any(),
+                apiUrl = any(),
+                headers = any(),
+                enabled = any()
+            )
+        } answers {
+            persistedAgentId = invocation.args[6] as String?
+        }
+        every { dao.getById(dslContext, any()) } answers {
+            storedRecord(
+                platform = ExternalAgentPlatform.KNOT.name,
+                apiUrl = "https://knot.woa.com/apigw/api/v1/agents/agui/c68413c904234d419279e43dbf815e88",
+                headers = PLAIN_HEADERS
+            ).apply {
+                agentId = persistedAgentId ?: agentId
+            }
+        }
+
+        val info = service.create(
+            USER_ID,
+            ExternalAgentCreate(
+                agentName = "knot-agent",
+                description = "desc",
+                platform = ExternalAgentPlatform.KNOT,
+                apiUrl = "https://knot.woa.com/apigw/api/v1/agents/agui/c68413c904234d419279e43dbf815e88",
+                headers = PLAIN_HEADERS,
+                enabled = true
+            )
+        )
+
+        assertEquals("c68413c904234d419279e43dbf815e88", persistedAgentId)
+        assertEquals("c68413c904234d419279e43dbf815e88", info.agentId)
+    }
+
+    @Test
+    fun `create should fallback BkAiDev agentId to agentName`() {
+        var persistedAgentId: String? = null
+        every {
+            dao.create(
+                dslContext = dslContext,
+                id = any(),
+                userId = any(),
+                agentName = any(),
+                description = any(),
+                platform = any(),
+                agentId = any(),
+                apiUrl = any(),
+                headers = any(),
+                enabled = any()
+            )
+        } answers {
+            persistedAgentId = invocation.args[6] as String?
+        }
+        every { dao.getById(dslContext, any()) } answers {
+            storedRecord(
+                platform = ExternalAgentPlatform.BKAIDEV.name,
+                apiUrl = "https://example.com/chat_completion",
+                headers = null
+            ).apply {
+                agentName = "bk-agent"
+                agentId = persistedAgentId ?: agentId
+            }
+        }
+
+        val info = service.create(
+            USER_ID,
+            ExternalAgentCreate(
+                agentName = "bk-agent",
+                description = "desc",
+                platform = ExternalAgentPlatform.BKAIDEV,
+                apiUrl = "https://example.com/chat_completion",
+                enabled = true
+            )
+        )
+
+        assertEquals("bk-agent", persistedAgentId)
+        assertEquals("bk-agent", info.agentId)
+    }
+
+    @Test
     fun `update should merge BkAiDev auth config with stored headers`() {
         val encrypted = AESUtil.encrypt(
             AES_KEY,
