@@ -8,6 +8,7 @@ import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.agent.external.ExternalAgentInput
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import com.tencent.devops.ai.service.ExternalAgentService
 import io.mockk.every
@@ -37,10 +38,16 @@ class ExternalAgentGatewayTest {
     }
 
     @Test
-    fun `stream should route to platform adapter ignoring case`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "knot")
+    fun `stream should route to matching platform adapter`() {
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(FakeAdapter("KNOT", listOf(ExternalAgentEvent.TextDelta("hello"))))
+            adapters = listOf(
+                FakeAdapter(
+                    ExternalAgentPlatform.KNOT,
+                    listOf(ExternalAgentEvent.TextDelta("hello"))
+                )
+            )
         )
 
         val events = gateway.stream(USER_ID, CONFIG_ID, request()).collectList().block()
@@ -50,8 +57,11 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should fail before upstream call when platform is unsupported`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "UNKNOWN")
-        val gateway = newGateway(adapters = listOf(FakeAdapter("KNOT", emptyList())))
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
+        val gateway = newGateway(
+            adapters = listOf(FakeAdapter(ExternalAgentPlatform.BKAIDEV, emptyList()))
+        )
 
         val error = assertThrows(ExternalAgentGatewayException::class.java) {
             gateway.stream(USER_ID, CONFIG_ID, request()).blockLast()
@@ -62,9 +72,10 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should map first token timeout to timeout category`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(NeverAdapter("KNOT")),
+            adapters = listOf(NeverAdapter(ExternalAgentPlatform.KNOT)),
             properties = ExternalAgentGatewayProperties(firstTokenTimeoutSeconds = 1)
         )
 
@@ -77,9 +88,10 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should fail when total stream duration exceeds limit`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(DelayedAdapter("KNOT", Duration.ofSeconds(3))),
+            adapters = listOf(DelayedAdapter(ExternalAgentPlatform.KNOT, Duration.ofSeconds(3))),
             properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 2)
         )
 
@@ -92,9 +104,10 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should fail when upstream stalls after first event`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(StalledAfterFirstAdapter("KNOT")),
+            adapters = listOf(StalledAfterFirstAdapter(ExternalAgentPlatform.KNOT)),
             properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 1)
         )
 
@@ -107,9 +120,10 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should complete when total stream duration is within limit`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(DelayedAdapter("KNOT", Duration.ofMillis(100))),
+            adapters = listOf(DelayedAdapter(ExternalAgentPlatform.KNOT, Duration.ofMillis(100))),
             properties = ExternalAgentGatewayProperties(streamTimeoutSeconds = 120)
         )
 
@@ -126,9 +140,15 @@ class ExternalAgentGatewayTest {
 
     @Test
     fun `stream should fail when response exceeds max chars`() {
-        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns config(platform = "KNOT")
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
         val gateway = newGateway(
-            adapters = listOf(FakeAdapter("KNOT", listOf(ExternalAgentEvent.TextDelta("too-long")))),
+            adapters = listOf(
+                FakeAdapter(
+                    ExternalAgentPlatform.KNOT,
+                    listOf(ExternalAgentEvent.TextDelta("too-long"))
+                )
+            ),
             properties = ExternalAgentGatewayProperties(maxResponseChars = 3)
         )
 
@@ -137,6 +157,28 @@ class ExternalAgentGatewayTest {
         }
 
         assertEquals(ExternalAgentErrorCategory.UPSTREAM_ERROR, error.category)
+    }
+
+    @Test
+    fun `stream should retain original cause when mapping upstream error`() {
+        every { externalAgentService.getEnabled(USER_ID, CONFIG_ID) } returns
+            config(platform = ExternalAgentPlatform.KNOT)
+        val gateway = newGateway(
+            adapters = listOf(
+                FailingAdapter(
+                    ExternalAgentPlatform.KNOT,
+                    IllegalStateException("boom")
+                )
+            )
+        )
+
+        val error = assertThrows(ExternalAgentGatewayException::class.java) {
+            gateway.stream(USER_ID, CONFIG_ID, request()).blockLast()
+        }
+
+        assertEquals(ExternalAgentErrorCategory.UPSTREAM_ERROR, error.category)
+        assertEquals(IllegalStateException::class.java, error.cause!!::class.java)
+        assertEquals("boom", error.cause!!.message)
     }
 
     private fun newGateway(
@@ -154,7 +196,7 @@ class ExternalAgentGatewayTest {
         return ExternalAgentInput(query = "hello")
     }
 
-    private fun config(platform: String): ExternalAgentInfo {
+    private fun config(platform: ExternalAgentPlatform): ExternalAgentInfo {
         return ExternalAgentInfo(
             id = CONFIG_ID,
             userId = USER_ID,
@@ -171,10 +213,10 @@ class ExternalAgentGatewayTest {
     }
 
     private class FakeAdapter(
-        private val platform: String,
+        private val platform: ExternalAgentPlatform,
         private val events: List<ExternalAgentEvent>
     ) : ExternalAgentAdapter {
-        override fun platform(): String = platform
+        override fun platform(): ExternalAgentPlatform = platform
 
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
             return Flux.fromIterable(events)
@@ -182,9 +224,9 @@ class ExternalAgentGatewayTest {
     }
 
     private class NeverAdapter(
-        private val platform: String
+        private val platform: ExternalAgentPlatform
     ) : ExternalAgentAdapter {
-        override fun platform(): String = platform
+        override fun platform(): ExternalAgentPlatform = platform
 
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
             return Flux.never()
@@ -192,9 +234,9 @@ class ExternalAgentGatewayTest {
     }
 
     private class StalledAfterFirstAdapter(
-        private val platform: String
+        private val platform: ExternalAgentPlatform
     ) : ExternalAgentAdapter {
-        override fun platform(): String = platform
+        override fun platform(): ExternalAgentPlatform = platform
 
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
             return Flux.concat(
@@ -205,10 +247,10 @@ class ExternalAgentGatewayTest {
     }
 
     private class DelayedAdapter(
-        private val platform: String,
+        private val platform: ExternalAgentPlatform,
         private val delayAfterFirst: Duration
     ) : ExternalAgentAdapter {
-        override fun platform(): String = platform
+        override fun platform(): ExternalAgentPlatform = platform
 
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
             return Flux.concat(
@@ -216,6 +258,17 @@ class ExternalAgentGatewayTest {
                 Flux.just(ExternalAgentEvent.TextDelta("second"))
                     .delayElements(delayAfterFirst)
             )
+        }
+    }
+
+    private class FailingAdapter(
+        private val platform: ExternalAgentPlatform,
+        private val error: Throwable
+    ) : ExternalAgentAdapter {
+        override fun platform(): ExternalAgentPlatform = platform
+
+        override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> {
+            return Flux.error(error)
         }
     }
 

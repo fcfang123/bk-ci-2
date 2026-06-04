@@ -21,7 +21,7 @@ class ExternalAgentGateway @Autowired constructor(
     private val properties: ExternalAgentGatewayProperties
 ) {
 
-    private val adapterMap = adapters.associateBy { it.platform().uppercase() }
+    private val adapterMap = adapters.associateBy { it.platform() }
 
     fun stream(
         userId: String,
@@ -38,7 +38,7 @@ class ExternalAgentGateway @Autowired constructor(
         }
 
         val config = externalAgentService.getEnabled(userId = userId, configId = configId)
-        val platform = config.platform.uppercase()
+        val platform = config.platform
         val adapter = adapterMap[platform] ?: return Flux.error(
             ExternalAgentGatewayException(
                 category = ExternalAgentErrorCategory.UNSUPPORTED_PLATFORM,
@@ -48,7 +48,7 @@ class ExternalAgentGateway @Autowired constructor(
 
         logger.info(
             "[ExternalAgentGateway] stream start: userId={}, configId={}, platform={}, threadId={}, runId={}",
-            userId, configId, config.platform, input.threadId, input.runId
+            userId, configId, config.platform.name, input.threadId, input.runId
         )
 
         val responseChars = AtomicInteger(0)
@@ -75,7 +75,7 @@ class ExternalAgentGateway @Autowired constructor(
                 startedAt = startedAt,
                 userId = userId,
                 configId = configId,
-                platform = config.platform,
+                platform = config.platform.name,
                 input = input
             )
             recordEventType(eventCount, eventTypeCounts, event)
@@ -86,7 +86,7 @@ class ExternalAgentGateway @Autowired constructor(
                         "threadId={}, runId={}, totalMs={}, size={}, category={}",
                 userId,
                 configId,
-                config.platform,
+                config.platform.name,
                 input.threadId,
                 input.runId,
                 System.currentTimeMillis() - startedAt,
@@ -103,7 +103,7 @@ class ExternalAgentGateway @Autowired constructor(
                             "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
                     userId,
                     configId,
-                    config.platform,
+                    config.platform.name,
                     input.threadId,
                     input.runId,
                     System.currentTimeMillis() - startedAt,
@@ -116,7 +116,7 @@ class ExternalAgentGateway @Autowired constructor(
                         "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
                 userId,
                 configId,
-                config.platform,
+                config.platform.name,
                 input.threadId,
                 input.runId,
                 System.currentTimeMillis() - startedAt,
@@ -128,31 +128,38 @@ class ExternalAgentGateway @Autowired constructor(
             if (error is ExternalAgentGatewayException) {
                 error
             } else if (error is TimeoutException) {
-                ExternalAgentGatewayException(
+                gatewayError(
                     category = ExternalAgentErrorCategory.TIMEOUT,
-                    message = "外部智能体响应超时，请稍后重试"
+                    message = "外部智能体响应超时，请稍后重试",
+                    cause = error
                 )
             } else {
-                ExternalAgentGatewayException(
+                gatewayError(
                     category = ExternalAgentErrorCategory.UPSTREAM_ERROR,
-                    message = "外部智能体调用失败，请稍后重试"
+                    message = "外部智能体调用失败，请稍后重试",
+                    cause = error
                 )
             }
         }.doOnError { error ->
             val category = (error as? ExternalAgentGatewayException)?.category
                 ?: ExternalAgentErrorCategory.UPSTREAM_ERROR
+            val rootCause = error.cause
             logger.warn(
                 "[ExternalAgentGateway] stream failed: userId={}, configId={}, platform={}, " +
-                        "threadId={}, runId={}, totalMs={}, size={}, category={}, error={}",
+                        "threadId={}, runId={}, totalMs={}, size={}, category={}, errorType={}, " +
+                        "error={}, causeType={}, cause={}",
                 userId,
                 configId,
-                config.platform,
+                config.platform.name,
                 input.threadId,
                 input.runId,
                 System.currentTimeMillis() - startedAt,
                 responseChars.get(),
                 category,
-                error.message
+                error.javaClass.simpleName,
+                error.message,
+                rootCause?.javaClass?.simpleName,
+                rootCause?.message
             )
         }
     }
@@ -173,6 +180,19 @@ class ExternalAgentGateway @Autowired constructor(
             category = ExternalAgentErrorCategory.TIMEOUT,
             message = "外部智能体响应超时，请稍后重试"
         )
+    }
+
+    private fun gatewayError(
+        category: ExternalAgentErrorCategory,
+        message: String,
+        cause: Throwable
+    ): ExternalAgentGatewayException {
+        return ExternalAgentGatewayException(
+            category = category,
+            message = message
+        ).apply {
+            initCause(cause)
+        }
     }
 
     private fun recordFirstToken(

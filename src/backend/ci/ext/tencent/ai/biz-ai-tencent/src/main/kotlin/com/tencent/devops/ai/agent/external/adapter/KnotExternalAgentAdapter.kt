@@ -8,6 +8,7 @@ import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
 import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
+import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.service.AiMcpServerService
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -23,7 +24,7 @@ class KnotExternalAgentAdapter : ExternalAgentAdapter {
         .codecs { it.defaultCodecs().maxInMemorySize(MAX_RESPONSE_SIZE) }
         .build()
 
-    override fun platform(): String = "KNOT"
+    override fun platform(): ExternalAgentPlatform = ExternalAgentPlatform.KNOT
 
     override fun validateConfig(config: ExternalAgentConfigValidationContext) {
         if (config.apiUrl.isBlank() || !config.apiUrl.contains(AGUI_PATH)) {

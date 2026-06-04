@@ -6,6 +6,7 @@ import com.tencent.devops.ai.agent.external.ExternalAgentGateway
 import com.tencent.devops.ai.agent.external.ExternalAgentInput
 import com.tencent.devops.ai.agent.external.ExternalAgentTools
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.service.ExternalAgentService
 import io.agentscope.core.agent.Agent
 import io.agentscope.core.agui.event.AguiEvent
@@ -272,7 +273,7 @@ class ExternalAgentToolsTest {
                 userId = USER_ID,
                 agentName = EXTERNAL_AGENT_NAME,
                 description = "demo",
-                platform = "KNOT",
+                platform = ExternalAgentPlatform.KNOT,
                 agentId = "agent-id",
                 apiUrl = "https://example.com",
                 headers = null,

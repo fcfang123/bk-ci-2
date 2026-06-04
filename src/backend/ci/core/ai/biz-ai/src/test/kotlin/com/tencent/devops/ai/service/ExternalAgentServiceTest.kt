@@ -1,11 +1,15 @@
 package com.tencent.devops.ai.service
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.tencent.devops.ai.dao.ExternalAgentConfigDao
 import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
 import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
 import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
+import com.tencent.devops.ai.pojo.ExternalAgentAuthConfig
+import com.tencent.devops.ai.pojo.ExternalAgentAuthMode
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
+import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.util.AESUtil
 import com.tencent.devops.common.api.util.JsonUtil
@@ -16,6 +20,7 @@ import io.mockk.verify
 import org.jooq.DSLContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
 import java.time.LocalDateTime
@@ -24,11 +29,14 @@ class ExternalAgentServiceTest {
 
     private val dslContext = mockk<DSLContext>(relaxed = true)
     private val dao = mockk<ExternalAgentConfigDao>(relaxed = true)
-    private val adapter = PermissiveKnotAdapter()
+    private val adapters = listOf(
+        PermissiveAdapter(ExternalAgentPlatform.KNOT),
+        PermissiveAdapter(ExternalAgentPlatform.BKAIDEV)
+    )
     private val service = ExternalAgentService(
         dslContext = dslContext,
         dao = dao,
-        adapters = listOf(adapter),
+        adapters = adapters,
         aesKey = AES_KEY
     )
 
@@ -174,11 +182,140 @@ class ExternalAgentServiceTest {
         assertEquals(PLAIN_HEADERS, info.headers)
     }
 
+    @Test
+    fun `create should assemble BkAiDev user headers from auth config`() {
+        var persistedHeaders: String? = null
+        every {
+            dao.create(
+                dslContext = dslContext,
+                id = any(),
+                userId = any(),
+                agentName = any(),
+                description = any(),
+                platform = any(),
+                agentId = any(),
+                apiUrl = any(),
+                headers = any(),
+                enabled = any()
+            )
+        } answers {
+            persistedHeaders = invocation.args[8] as String?
+        }
+        every { dao.getById(dslContext, any()) } answers {
+            storedRecord(
+                platform = ExternalAgentPlatform.BKAIDEV.name,
+                apiUrl = "https://example.com/chat_completion",
+                headers = persistedHeaders
+            )
+        }
+
+        val info = service.create(
+            USER_ID,
+            ExternalAgentCreate(
+                agentName = "aid",
+                description = "desc",
+                platform = ExternalAgentPlatform.BKAIDEV,
+                agentId = "agent-id",
+                apiUrl = "https://example.com/chat_completion",
+                authConfig = ExternalAgentAuthConfig(
+                    authMode = ExternalAgentAuthMode.USER,
+                    accessToken = "token"
+                ),
+                enabled = true
+            )
+        )
+
+        val decryptedHeaders = AESUtil.decrypt(AES_KEY, persistedHeaders!!)
+        val parsedHeaders = AiMcpServerService.parseHeaders(decryptedHeaders)
+        val authHeader = JsonUtil.to(
+            parsedHeaders["X-Bkapi-Authorization"]!!,
+            object : TypeReference<Map<String, String>>() {}
+        )
+        assertNotNull(info.authConfig)
+        val authConfig = info.authConfig!!
+        assertEquals(ExternalAgentAuthMode.USER, authConfig.authMode)
+        assertEquals(MASKED_HEADER_VALUE, authConfig.accessToken)
+        assertEquals(mapOf("access_token" to "token"), authHeader)
+    }
+
+    @Test
+    fun `update should merge BkAiDev auth config with stored headers`() {
+        val encrypted = AESUtil.encrypt(
+            AES_KEY,
+            JsonUtil.toJson(
+                linkedMapOf(
+                    "X-Bkapi-Authorization" to """{"bk_app_code":"app","bk_app_secret":"secret"}""",
+                    "X-BKAIDEV-USER" to "old-user"
+                )
+            )
+        )
+        var persistedHeaders: String? = null
+        every { dao.getById(dslContext, CONFIG_ID) } returns storedRecord(
+            platform = ExternalAgentPlatform.BKAIDEV.name,
+            apiUrl = "https://example.com/chat_completion",
+            headers = encrypted
+        )
+        every {
+            dao.update(
+                dslContext = dslContext,
+                id = CONFIG_ID,
+                agentName = any(),
+                description = any(),
+                platform = any(),
+                agentId = any(),
+                apiUrl = any(),
+                headers = any(),
+                enabled = any()
+            )
+        } answers {
+            persistedHeaders = invocation.args[7] as String?
+            1
+        }
+
+        service.update(
+            USER_ID,
+            CONFIG_ID,
+            ExternalAgentUpdate(
+                authConfig = ExternalAgentAuthConfig(
+                    authMode = ExternalAgentAuthMode.APP,
+                    bkAiDevUser = "new-user"
+                )
+            )
+        )
+
+        val decryptedHeaders = AESUtil.decrypt(AES_KEY, persistedHeaders!!)
+        val parsedHeaders = AiMcpServerService.parseHeaders(decryptedHeaders)
+        assertEquals("new-user", parsedHeaders["X-BKAIDEV-USER"])
+        assertEquals(
+            mapOf(
+                "bk_app_code" to "app",
+                "bk_app_secret" to "secret"
+            ),
+            JsonUtil.to(
+                parsedHeaders["X-Bkapi-Authorization"]!!,
+                object : TypeReference<Map<String, String>>() {}
+            )
+        )
+    }
+
+    @Test
+    fun `getEnabled should expose structured knot auth config`() {
+        every { dao.getById(dslContext, CONFIG_ID) } returns storedRecord(
+            platform = ExternalAgentPlatform.KNOT.name,
+            headers = AESUtil.encrypt(AES_KEY, PLAIN_HEADERS)
+        )
+
+        val info = service.getEnabled(USER_ID, CONFIG_ID)
+
+        assertEquals("secret-token", info.authConfig?.knotApiToken)
+        assertEquals("tester", info.authConfig?.knotApiUser)
+    }
+
     private fun createRequest(): ExternalAgentCreate {
         return ExternalAgentCreate(
             agentName = "agent",
             description = "desc",
-            platform = "KNOT",
+            platform = ExternalAgentPlatform.KNOT,
             agentId = "agent-id",
             apiUrl = "https://example.com/agui/run",
             headers = PLAIN_HEADERS,
@@ -187,6 +324,8 @@ class ExternalAgentServiceTest {
     }
 
     private fun storedRecord(
+        platform: String = ExternalAgentPlatform.KNOT.name,
+        apiUrl: String = "https://example.com/agui/run",
         headers: String? = PLAIN_HEADERS
     ): TAiExternalAgentConfigRecord {
         val now = LocalDateTime.now()
@@ -195,9 +334,9 @@ class ExternalAgentServiceTest {
             userId = USER_ID
             agentName = "agent"
             description = "desc"
-            platform = "KNOT"
+            this.platform = platform
             agentId = "agent-id"
-            apiUrl = "https://example.com/agui/run"
+            this.apiUrl = apiUrl
             this.headers = headers
             enabled = true
             createdTime = now
@@ -205,8 +344,10 @@ class ExternalAgentServiceTest {
         }
     }
 
-    private class PermissiveKnotAdapter : ExternalAgentAdapter {
-        override fun platform(): String = "KNOT"
+    private class PermissiveAdapter(
+        private val adapterPlatform: ExternalAgentPlatform
+    ) : ExternalAgentAdapter {
+        override fun platform(): ExternalAgentPlatform = adapterPlatform
 
         override fun validateConfig(config: ExternalAgentConfigValidationContext) = Unit
 

@@ -8,10 +8,13 @@ import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
 import com.tencent.devops.ai.agent.external.ExternalAgentEvent
 import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
+import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.service.AiMcpServerService
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.WebClientRequestException
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToFlux
 import reactor.core.publisher.Flux
@@ -23,7 +26,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
         .codecs { it.defaultCodecs().maxInMemorySize(MAX_RESPONSE_SIZE) }
         .build()
 
-    override fun platform(): String = "BKAIDEV"
+    override fun platform(): ExternalAgentPlatform = ExternalAgentPlatform.BKAIDEV
 
     override fun validateConfig(config: ExternalAgentConfigValidationContext) {
         if (config.apiUrl.isBlank()) {
@@ -81,6 +84,18 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
             }
             .concatMap { chunk -> Flux.fromIterable(lineBuffer.accept(chunk)) }
             .concatWith(Flux.defer { Flux.fromIterable(lineBuffer.flush()) })
+            .doOnError { error ->
+                logger.warn(
+                    "[ExternalAgentGateway] BkAiDev upstream failed: userId={}, configId={}, " +
+                        "platform={}, url={}, errorType={}, detail={}",
+                    request.userId,
+                    config.id,
+                    config.platform,
+                    config.apiUrl,
+                    error.javaClass.simpleName,
+                    summarizeUpstreamError(error)
+                )
+            }
             .doOnCancel {
                 logger.info(
                     "[ExternalAgentGateway] BkAiDev stream cancelled: userId={}, configId={}",
@@ -95,6 +110,7 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
         private const val USER_ACCESS_TOKEN_KEY = "access_token"
         private const val PLUGIN_INVOKE_PATH = "/prod/invoke/"
         private const val MAX_RESPONSE_SIZE = 10 * 1024 * 1024
+        private const val MAX_ERROR_DETAIL_CHARS = 1000
         private val logger = LoggerFactory.getLogger(BkAiDevExternalAgentAdapter::class.java)
 
         private fun invalidConfig(message: String): ExternalAgentGatewayException {
@@ -102,6 +118,44 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
                 category = ExternalAgentErrorCategory.CONFIG_INVALID,
                 message = message
             )
+        }
+
+        internal fun summarizeUpstreamError(error: Throwable): String {
+            return when (error) {
+                is WebClientResponseException -> {
+                    val contentType = error.headers.contentType?.toString() ?: "unknown"
+                    val responseBody = sanitizeForLog(error.responseBodyAsString)
+                    "status=${error.statusCode.value()}, statusText=${error.statusText}, " +
+                        "contentType=$contentType, body=$responseBody"
+                }
+
+                is WebClientRequestException -> {
+                    val rootCause = error.cause ?: error
+                    val causeMessage = sanitizeForLog(rootCause.message)
+                    "method=${error.method}, uri=${error.uri}, causeType=${rootCause.javaClass.simpleName}, " +
+                        "causeMessage=$causeMessage"
+                }
+
+                else -> {
+                    val cause = error.cause
+                    val causeType = cause?.javaClass?.simpleName ?: "none"
+                    val causeMessage = sanitizeForLog(cause?.message)
+                    val message = sanitizeForLog(error.message)
+                    "message=$message, causeType=$causeType, causeMessage=$causeMessage"
+                }
+            }
+        }
+
+        private fun sanitizeForLog(message: String?): String {
+            if (message.isNullOrBlank()) {
+                return "-"
+            }
+            val normalized = message.replace(Regex("\\s+"), " ").trim()
+            return if (normalized.length <= MAX_ERROR_DETAIL_CHARS) {
+                normalized
+            } else {
+                normalized.take(MAX_ERROR_DETAIL_CHARS) + "...(truncated)"
+            }
         }
     }
 }

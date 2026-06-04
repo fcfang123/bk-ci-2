@@ -29,30 +29,20 @@ package com.tencent.devops.ai.pojo
 
 import io.swagger.v3.oas.annotations.media.Schema
 
-@Schema(title = "外部智能体-创建请求")
-data class ExternalAgentCreate(
-    @get:Schema(title = "显示名称", required = true, example = "Code Review 助手")
-    val agentName: String,
-    @get:Schema(title = "能力描述", required = true, example = "审查代码变更，发现潜在问题")
-    val description: String,
-    @get:Schema(title = "平台类型", required = true)
-    val platform: ExternalAgentPlatform,
-    @get:Schema(title = "平台上的Agent ID", required = true)
-    val agentId: String,
-    @get:Schema(title = "API端点URL", required = true)
-    val apiUrl: String,
-    @get:Schema(
-        title = "结构化认证配置",
-        description = "推荐优先传该字段，由后端按平台组装 headers",
-        required = false
-    )
-    val authConfig: ExternalAgentAuthConfig? = null,
-    @get:Schema(
-        title = "认证头JSON",
-        description = "兼容旧版本，未传 authConfig 时仍可直接传 headers",
-        required = false
-    )
-    val headers: String? = null,
-    @get:Schema(title = "是否启用", required = false)
-    val enabled: Boolean = true
+@Schema(title = "外部智能体-结构化认证配置")
+data class ExternalAgentAuthConfig(
+    @get:Schema(title = "认证模式，仅 BKAIDEV 使用", example = "USER")
+    val authMode: ExternalAgentAuthMode? = null,
+    @get:Schema(title = "蓝鲸应用 ID，仅 BKAIDEV 应用态使用")
+    val bkAppCode: String? = null,
+    @get:Schema(title = "蓝鲸应用密钥，仅 BKAIDEV 应用态使用")
+    val bkAppSecret: String? = null,
+    @get:Schema(title = "用户 access_token，仅 BKAIDEV 用户态使用")
+    val accessToken: String? = null,
+    @get:Schema(title = "BKAIDEV 用户名，仅 BKAIDEV 应用态使用")
+    val bkAiDevUser: String? = null,
+    @get:Schema(title = "Knot 个人或团队 token")
+    val knotApiToken: String? = null,
+    @get:Schema(title = "Knot 当前真实用户")
+    val knotApiUser: String? = null
 )
