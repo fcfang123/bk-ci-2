@@ -69,7 +69,6 @@ class BkAiDevExternalAgentAdapter : ExternalAgentAdapter {
         return webClient.post()
             .uri(config.apiUrl)
             .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.TEXT_EVENT_STREAM)
             .headers { httpHeaders -> headers.forEach { (key, value) -> httpHeaders.set(key, value) } }
             .bodyValue(body)
             .retrieve()

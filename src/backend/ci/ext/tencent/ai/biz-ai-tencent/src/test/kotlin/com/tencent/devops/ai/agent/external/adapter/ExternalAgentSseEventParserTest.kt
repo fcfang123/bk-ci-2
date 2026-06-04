@@ -55,6 +55,18 @@ class ExternalAgentSseEventParserTest {
     }
 
     @Test
+    fun `BkAiDev parser should read camel case threadId as conversation id`() {
+        val chunk = """
+            data: {"type":"RUN_STARTED","threadId":"thread-2"}
+
+        """.trimIndent()
+
+        val events = ExternalAgentSseEventParser.parseBkAiDev(chunk)
+
+        assertEquals(listOf(ExternalAgentEvent.ConversationId("thread-2")), events)
+    }
+
+    @Test
     fun `Knot parser should read rawEvent content and conversation id`() {
         val chunk = """
             data: {"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":"hello","conversation_id":"conv-1"}}
