@@ -40,11 +40,13 @@ data class ExternalAgentInfo(
     @get:Schema(title = "能力描述")
     val description: String,
     @get:Schema(title = "平台类型")
-    val platform: String,
+    val platform: ExternalAgentPlatform,
     @get:Schema(title = "平台上的Agent ID")
     val agentId: String,
     @get:Schema(title = "API端点URL")
     val apiUrl: String,
+    @get:Schema(title = "结构化认证配置")
+    val authConfig: ExternalAgentAuthConfig? = null,
     @get:Schema(title = "认证头JSON")
     val headers: String?,
     @get:Schema(title = "是否启用")

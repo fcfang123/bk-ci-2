@@ -27,32 +27,39 @@
 
 package com.tencent.devops.ai.pojo
 
-import io.swagger.v3.oas.annotations.media.Schema
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonValue
 
-@Schema(title = "外部智能体-创建请求")
-data class ExternalAgentCreate(
-    @get:Schema(title = "显示名称", required = true, example = "Code Review 助手")
-    val agentName: String,
-    @get:Schema(title = "能力描述", required = true, example = "审查代码变更，发现潜在问题")
-    val description: String,
-    @get:Schema(title = "平台类型", required = true)
-    val platform: ExternalAgentPlatform,
-    @get:Schema(title = "平台上的Agent ID", required = true)
-    val agentId: String,
-    @get:Schema(title = "API端点URL", required = true)
-    val apiUrl: String,
-    @get:Schema(
-        title = "结构化认证配置",
-        description = "推荐优先传该字段，由后端按平台组装 headers",
-        required = false
-    )
-    val authConfig: ExternalAgentAuthConfig? = null,
-    @get:Schema(
-        title = "认证头JSON",
-        description = "兼容旧版本，未传 authConfig 时仍可直接传 headers",
-        required = false
-    )
-    val headers: String? = null,
-    @get:Schema(title = "是否启用", required = false)
-    val enabled: Boolean = true
-)
+enum class ExternalAgentPlatform(
+    @get:JsonValue
+    val value: String
+) {
+    BKAIDEV("BKAIDEV"),
+    KNOT("KNOT");
+
+    companion object {
+        @JvmStatic
+        @JsonCreator
+        fun fromValue(value: String): ExternalAgentPlatform {
+            return entries.firstOrNull { it.value.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("Unsupported external agent platform: $value")
+        }
+    }
+}
+
+enum class ExternalAgentAuthMode(
+    @get:JsonValue
+    val value: String
+) {
+    APP("APP"),
+    USER("USER");
+
+    companion object {
+        @JvmStatic
+        @JsonCreator
+        fun fromValue(value: String): ExternalAgentAuthMode {
+            return entries.firstOrNull { it.value.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("Unsupported external agent auth mode: $value")
+        }
+    }
+}

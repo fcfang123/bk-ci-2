@@ -114,10 +114,19 @@ class SubAgentFactory @Autowired constructor(
         val toolkit = Toolkit(
             ToolkitConfig.builder().parallel(true).build()
         )
+        populateMcpClients(toolkit, userId, bindAgent)
+        return toolkit
+    }
+
+    fun populateMcpClients(
+        toolkit: Toolkit,
+        userId: String,
+        bindAgent: String
+    ) {
         val configs = mcpServerService.getMergedConfigs(
             userId, bindAgent
         )
-        if (configs.isEmpty()) return toolkit
+        if (configs.isEmpty()) return
         logger.info(
             "[SubAgentFactory] Loading {} MCP(s) for " +
                 "bindAgent={}, userId={}",
@@ -139,7 +148,6 @@ class SubAgentFactory @Autowired constructor(
                 )
             }
         }
-        return toolkit
     }
 
     fun buildSkillBox(

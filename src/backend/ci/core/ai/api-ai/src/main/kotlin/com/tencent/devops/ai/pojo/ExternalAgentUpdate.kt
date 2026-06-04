@@ -35,13 +35,15 @@ data class ExternalAgentUpdate(
     val agentName: String? = null,
     @get:Schema(title = "能力描述", required = false)
     val description: String? = null,
-    @get:Schema(title = "平台类型：KNOT / BKAIDEV", required = false)
-    val platform: String? = null,
+    @get:Schema(title = "平台类型", required = false)
+    val platform: ExternalAgentPlatform? = null,
     @get:Schema(title = "平台上的Agent ID", required = false)
     val agentId: String? = null,
     @get:Schema(title = "API端点URL", required = false)
     val apiUrl: String? = null,
-    @get:Schema(title = "认证头JSON", required = false)
+    @get:Schema(title = "结构化认证配置", required = false)
+    val authConfig: ExternalAgentAuthConfig? = null,
+    @get:Schema(title = "认证头JSON", description = "兼容旧版本，未传 authConfig 时使用", required = false)
     val headers: String? = null,
     @get:Schema(title = "是否启用", required = false)
     val enabled: Boolean? = null
