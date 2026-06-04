@@ -25,7 +25,7 @@ object ExternalAgentSseEventParser {
                         listOfNotNull(content?.takeIf { it.isNotEmpty() }?.let { ExternalAgentEvent.TextDelta(it) })
                     }
                     "RUN_STARTED" -> {
-                        val threadId = event["thread_id"]?.toString()
+                        val threadId = event["threadId"]?.toString() ?: event["thread_id"]?.toString()
                         listOfNotNull(
                             threadId?.takeIf { it.isNotBlank() }?.let {
                                 ExternalAgentEvent.ConversationId(it)
