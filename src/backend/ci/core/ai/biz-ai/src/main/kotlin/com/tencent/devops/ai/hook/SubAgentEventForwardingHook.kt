@@ -80,16 +80,6 @@ class SubAgentEventForwardingHook @Autowired constructor(
             CUSTOM_EVENT_NAME,
             eventData
         )
-        logger.info(
-            "[SubAgentEventForwardingHook] forward subagent_event: threadId={}, runId={}, agentName={}, " +
-                "subEventType={}, isLast={}, content={}",
-            sinkInfo.threadId,
-            sinkInfo.runId,
-            agentName,
-            subEvent.type.name,
-            subEvent.isLast,
-            summarizeContent(eventData["content"]?.toString())
-        )
         sinkInfo.sink.tryEmitNext(customEvent)
 
         return Mono.just(event)
@@ -180,17 +170,5 @@ class SubAgentEventForwardingHook @Autowired constructor(
         private const val META_SUBAGENT_NAME = "subagent_name"
         private const val CUSTOM_EVENT_NAME = "subagent_event"
         private const val MAX_CONTENT = 2000
-
-        private fun summarizeContent(content: String?): String {
-            if (content.isNullOrBlank()) {
-                return "-"
-            }
-            val normalized = content.replace(Regex("\\s+"), " ").trim()
-            return if (normalized.length <= 120) {
-                normalized
-            } else {
-                normalized.take(120) + "...(truncated)"
-            }
-        }
     }
 }
