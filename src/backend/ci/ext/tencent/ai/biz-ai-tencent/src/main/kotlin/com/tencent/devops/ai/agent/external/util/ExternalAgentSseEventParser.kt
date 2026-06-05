@@ -3,7 +3,9 @@ package com.tencent.devops.ai.agent.external.util
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.tencent.devops.ai.agent.external.ExternalAgentErrorCategory
+import com.tencent.devops.ai.agent.external.ExternalAgentErrors
 import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.constant.AiMessageCode
 import org.slf4j.LoggerFactory
 
 object ExternalAgentSseEventParser {
@@ -116,7 +118,9 @@ object ExternalAgentSseEventParser {
             )
             listOf(
                 ExternalAgentEvent.Error(
-                    message = "外部智能体事件解析失败",
+                    message = ExternalAgentErrors.resolveMessage(
+                        AiMessageCode.EXTERNAL_AGENT_SSE_PARSE_FAILED
+                    ),
                     category = ExternalAgentErrorCategory.PARSE_ERROR
                 )
             )
@@ -124,8 +128,10 @@ object ExternalAgentSseEventParser {
     }
 
     private fun upstreamError(message: String?): ExternalAgentEvent.Error {
+        val resolvedMessage = message?.takeIf { it.isNotBlank() }
+            ?: ExternalAgentErrors.resolveMessage(AiMessageCode.EXTERNAL_AGENT_SSE_UPSTREAM_ERROR)
         return ExternalAgentEvent.Error(
-            message = message ?: "外部智能体返回错误",
+            message = resolvedMessage,
             category = ExternalAgentErrorCategory.UPSTREAM_ERROR
         )
     }

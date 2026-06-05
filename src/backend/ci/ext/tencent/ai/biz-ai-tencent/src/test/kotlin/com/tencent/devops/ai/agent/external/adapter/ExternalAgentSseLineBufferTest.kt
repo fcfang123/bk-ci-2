@@ -130,8 +130,10 @@ class ExternalAgentSseLineBufferTest {
     fun `Knot buffer should not emit parse error for split JSON`() {
         val buffer = ExternalAgentSseLineBuffer(ExternalAgentSseEventParser::parseKnot)
 
-        buffer.accept("""data: {"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":"a""")
-        val events = buffer.accept(""","conversation_id":"id-1"}}""" + "\n")
+        // Split inside the content string (same as the hello split test). Do not start chunk2 with
+        // """," because Kotlin parses that as an empty """ string plus a regular "," literal.
+        buffer.accept("""data: {"type":"TEXT_MESSAGE_CONTENT","rawEvent":{"content":""")
+        val events = buffer.accept(""""a","conversation_id":"id-1"}}""" + "\n")
 
         assertTrue(events.none { it is ExternalAgentEvent.Error })
         assertEquals(

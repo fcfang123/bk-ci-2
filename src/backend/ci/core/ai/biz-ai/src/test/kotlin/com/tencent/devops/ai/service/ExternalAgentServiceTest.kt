@@ -3,12 +3,20 @@ package com.tencent.devops.ai.service
 import com.fasterxml.jackson.core.type.TypeReference
 import com.tencent.devops.ai.dao.ExternalAgentConfigDao
 import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentAgentIdRecalculationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentAgentIdResolveContext
+import com.tencent.devops.ai.agent.external.ExternalAgentAuthHeadersBuildContext
 import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
 import com.tencent.devops.ai.agent.external.ExternalAgentEvent
+import com.tencent.devops.ai.agent.external.ExternalAgentErrors
+import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.constant.AiMessageCode
 import com.tencent.devops.ai.agent.external.ExternalAgentRequest
 import com.tencent.devops.ai.pojo.ExternalAgentAuthConfig
+import com.tencent.devops.ai.pojo.ExternalAgentAuthFieldInfo
 import com.tencent.devops.ai.pojo.ExternalAgentAuthMode
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
+import com.tencent.devops.ai.pojo.ExternalAgentPlatformConfigInfo
 import com.tencent.devops.ai.pojo.ExternalAgentPlatform
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.util.AESUtil
@@ -25,6 +33,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
 import java.time.LocalDateTime
+import java.net.URI
 
 class ExternalAgentServiceTest {
 
@@ -262,7 +271,7 @@ class ExternalAgentServiceTest {
         every { dao.getById(dslContext, any()) } answers {
             storedRecord(
                 platform = ExternalAgentPlatform.KNOT.name,
-                apiUrl = "https://knot.woa.com/apigw/api/v1/agents/agui/c68413c904234d419279e43dbf815e88",
+                apiUrl = "https://example.com/agents/agui/c68413c904234d419279e43dbf815e88",
                 headers = PLAIN_HEADERS
             ).apply {
                 agentId = persistedAgentId ?: agentId
@@ -275,7 +284,7 @@ class ExternalAgentServiceTest {
                 agentName = "knot-agent",
                 description = "desc",
                 platform = ExternalAgentPlatform.KNOT,
-                apiUrl = "https://knot.woa.com/apigw/api/v1/agents/agui/c68413c904234d419279e43dbf815e88",
+                apiUrl = "https://example.com/agents/agui/c68413c904234d419279e43dbf815e88",
                 headers = PLAIN_HEADERS,
                 enabled = true
             )
@@ -454,7 +463,176 @@ class ExternalAgentServiceTest {
 
         override fun validateConfig(config: ExternalAgentConfigValidationContext) = Unit
 
+        override fun resolveAgentId(context: ExternalAgentAgentIdResolveContext): String {
+            return when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT -> extractAgentId(context.apiUrl)
+                    ?: context.rawAgentId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: throw configError(AiMessageCode.EXTERNAL_AGENT_KNOT_AGENT_ID_FROM_URL)
+
+                ExternalAgentPlatform.BKAIDEV -> context.rawAgentId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: context.agentName.trim().takeIf { it.isNotBlank() }
+                    ?: throw configError(AiMessageCode.EXTERNAL_AGENT_BKAIDEV_AGENT_NAME_REQUIRED)
+            }
+        }
+
+        override fun shouldRecalculateAgentId(context: ExternalAgentAgentIdRecalculationContext): Boolean {
+            return when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT ->
+                    context.platformChanged || context.apiUrlChanged || context.agentIdChanged
+
+                ExternalAgentPlatform.BKAIDEV ->
+                    context.platformChanged || context.agentIdChanged || context.agentNameChanged
+            }
+        }
+
+        override fun buildAuthHeaders(context: ExternalAgentAuthHeadersBuildContext): String {
+            return when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT -> JsonUtil.toJson(
+                    linkedMapOf(
+                        "x-knot-api-token" to context.authConfig.values.getValue("knotApiToken"),
+                        "x-knot-api-user" to context.userId
+                    )
+                )
+
+                ExternalAgentPlatform.BKAIDEV -> {
+                    val payload = linkedMapOf<String, String>()
+                    when (context.authConfig.authMode) {
+                        ExternalAgentAuthMode.APP -> {
+                            payload["bk_app_code"] = context.authConfig.values.getValue("bkAppCode")
+                            payload["bk_app_secret"] = context.authConfig.values.getValue("bkAppSecret")
+                            JsonUtil.toJson(
+                                linkedMapOf(
+                                    "X-Bkapi-Authorization" to JsonUtil.toJson(payload, false),
+                                    "X-BKAIDEV-USER" to context.userId
+                                )
+                            )
+                        }
+
+                        else -> {
+                            payload["access_token"] = context.authConfig.values.getValue("accessToken")
+                            JsonUtil.toJson(
+                                linkedMapOf(
+                                    "X-Bkapi-Authorization" to JsonUtil.toJson(payload, false)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        override fun parseAuthConfig(headers: String?): ExternalAgentAuthConfig? {
+            val parsedHeaders = AiMcpServerService.parseHeaders(headers)
+            if (parsedHeaders.isEmpty()) {
+                return null
+            }
+            return when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT -> parsedHeaders["x-knot-api-token"]
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        ExternalAgentAuthConfig(values = mapOf("knotApiToken" to it))
+                    }
+
+                ExternalAgentPlatform.BKAIDEV -> {
+                    val authorization = parsedHeaders["X-Bkapi-Authorization"] ?: return null
+                    val values = linkedMapOf<String, String>()
+                    val payload = JsonUtil.to(
+                        authorization,
+                        object : TypeReference<Map<String, String>>() {}
+                    )
+                    payload["bk_app_code"]?.let { values["bkAppCode"] = it }
+                    payload["bk_app_secret"]?.let { values["bkAppSecret"] = it }
+                    payload["access_token"]?.let { values["accessToken"] = it }
+                    if (values.isEmpty()) {
+                        null
+                    } else {
+                        ExternalAgentAuthConfig(
+                            authMode = if ("accessToken" in values) {
+                                ExternalAgentAuthMode.USER
+                            } else {
+                                ExternalAgentAuthMode.APP
+                            },
+                            values = values
+                        )
+                    }
+                }
+            }
+        }
+
+        override fun platformConfigInfo(): ExternalAgentPlatformConfigInfo {
+            return when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT -> ExternalAgentPlatformConfigInfo(
+                    platform = ExternalAgentPlatform.KNOT,
+                    authFields = listOf(
+                        ExternalAgentAuthFieldInfo(
+                            key = "knotApiToken",
+                            label = "x-knot-api-token",
+                            description = "Knot 个人或团队 token",
+                            required = true,
+                            secret = true
+                        )
+                    )
+                )
+
+                ExternalAgentPlatform.BKAIDEV -> ExternalAgentPlatformConfigInfo(
+                    platform = ExternalAgentPlatform.BKAIDEV,
+                    authModes = listOf(ExternalAgentAuthMode.APP, ExternalAgentAuthMode.USER),
+                    authFields = listOf(
+                        ExternalAgentAuthFieldInfo(
+                            key = "bkAppCode",
+                            label = "bk_app_code",
+                            description = "BKAIDEV 应用态调用使用的 bk_app_code",
+                            required = true,
+                            authModes = listOf(ExternalAgentAuthMode.APP)
+                        ),
+                        ExternalAgentAuthFieldInfo(
+                            key = "bkAppSecret",
+                            label = "bk_app_secret",
+                            description = "BKAIDEV 应用态调用使用的 bk_app_secret",
+                            required = true,
+                            secret = true,
+                            authModes = listOf(ExternalAgentAuthMode.APP)
+                        ),
+                        ExternalAgentAuthFieldInfo(
+                            key = "accessToken",
+                            label = "access_token",
+                            description = "BKAIDEV 用户态调用使用的 access_token",
+                            required = true,
+                            secret = true,
+                            authModes = listOf(ExternalAgentAuthMode.USER)
+                        )
+                    )
+                )
+            }
+        }
+
+        override fun maskAuthConfig(authConfig: ExternalAgentAuthConfig?): ExternalAgentAuthConfig? {
+            if (authConfig == null) {
+                return null
+            }
+            val secretKeys = when (adapterPlatform) {
+                ExternalAgentPlatform.KNOT -> setOf("knotApiToken")
+                ExternalAgentPlatform.BKAIDEV -> setOf("bkAppSecret", "accessToken")
+            }
+            return authConfig.copy(
+                values = authConfig.values.mapValues { (key, value) ->
+                    if (key in secretKeys) MASKED_HEADER_VALUE else value
+                }
+            )
+        }
+
         override fun stream(request: ExternalAgentRequest): Flux<ExternalAgentEvent> = Flux.empty()
+
+        private fun extractAgentId(apiUrl: String): String? {
+            return runCatching { URI(apiUrl) }.getOrNull()
+                ?.path
+                ?.split("/")
+                ?.lastOrNull { it.isNotBlank() }
+        }
+
+        private fun configError(errorCode: String, vararg params: String): ExternalAgentGatewayException {
+            return ExternalAgentErrors.configInvalid(errorCode, *params)
+        }
     }
 
     companion object {

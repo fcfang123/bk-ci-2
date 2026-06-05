@@ -29,22 +29,12 @@ class ExternalAgentGateway @Autowired constructor(
         input: ExternalAgentInput
     ): Flux<ExternalAgentEvent> {
         if (!properties.enabled) {
-            return Flux.error(
-                ExternalAgentGatewayException(
-                    category = ExternalAgentErrorCategory.CONFIG_INVALID,
-                    message = "外部智能体流式网关未启用"
-                )
-            )
+            return Flux.error(ExternalAgentErrors.gatewayDisabled())
         }
 
         val config = externalAgentService.getEnabled(userId = userId, configId = configId)
         val platform = config.platform
-        val adapter = adapterMap[platform] ?: return Flux.error(
-            ExternalAgentGatewayException(
-                category = ExternalAgentErrorCategory.UNSUPPORTED_PLATFORM,
-                message = "暂不支持该外部智能体平台"
-            )
-        )
+        val adapter = adapterMap[platform] ?: return Flux.error(ExternalAgentErrors.unsupportedPlatform())
 
         logger.info(
             "[ExternalAgentGateway] stream start: userId={}, configId={}, platform={}, threadId={}, runId={}",
@@ -128,17 +118,9 @@ class ExternalAgentGateway @Autowired constructor(
             if (error is ExternalAgentGatewayException) {
                 error
             } else if (error is TimeoutException) {
-                gatewayError(
-                    category = ExternalAgentErrorCategory.TIMEOUT,
-                    message = "外部智能体响应超时，请稍后重试",
-                    cause = error
-                )
+                gatewayError(ExternalAgentErrors.gatewayTimeout(), error)
             } else {
-                gatewayError(
-                    category = ExternalAgentErrorCategory.UPSTREAM_ERROR,
-                    message = "外部智能体调用失败，请稍后重试",
-                    cause = error
-                )
+                gatewayError(ExternalAgentErrors.gatewayUpstreamFailed(), error)
             }
         }.doOnError { error ->
             val category = (error as? ExternalAgentGatewayException)?.category
@@ -176,21 +158,14 @@ class ExternalAgentGateway @Autowired constructor(
     }
 
     private fun timeoutException(): ExternalAgentGatewayException {
-        return ExternalAgentGatewayException(
-            category = ExternalAgentErrorCategory.TIMEOUT,
-            message = "外部智能体响应超时，请稍后重试"
-        )
+        return ExternalAgentErrors.gatewayTimeout()
     }
 
     private fun gatewayError(
-        category: ExternalAgentErrorCategory,
-        message: String,
+        exception: ExternalAgentGatewayException,
         cause: Throwable
     ): ExternalAgentGatewayException {
-        return ExternalAgentGatewayException(
-            category = category,
-            message = message
-        ).apply {
+        return exception.apply {
             initCause(cause)
         }
     }
@@ -227,10 +202,7 @@ class ExternalAgentGateway @Autowired constructor(
         }
         val currentSize = responseChars.addAndGet(event.delta.length)
         if (currentSize > properties.maxResponseChars) {
-            throw ExternalAgentGatewayException(
-                category = ExternalAgentErrorCategory.UPSTREAM_ERROR,
-                message = "外部智能体响应过大"
-            )
+            throw ExternalAgentErrors.gatewayResponseTooLarge()
         }
     }
 
