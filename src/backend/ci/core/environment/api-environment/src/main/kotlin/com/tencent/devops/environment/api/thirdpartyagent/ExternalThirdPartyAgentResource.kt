@@ -141,13 +141,19 @@ interface ExternalThirdPartyAgentResource {
         agentType: AgentType?
     ): Response
 
-    @Operation(summary = "根据设备添加创作流节点")
+    @Operation(summary = "根据设备获取创作流节点安装脚本，给虾插件用的")
     @POST
-    @Path("/addCreateNodeByDeviceId")
-    fun addCreateNode(
+    @Path("/genCreateNodeInstallScript")
+    fun genCreateNodeInstallScript(
+        @QueryParam("token")
+        token: String,
         @QueryParam("deviceId")
         deviceId: String,
+        @QueryParam("userId")
+        userId: String,
         @QueryParam("os")
-        os: OS
-    ): String
+        os: OS,
+        @QueryParam("zoneName")
+        zoneName: String?
+    ): Response
 }

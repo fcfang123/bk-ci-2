@@ -102,7 +102,7 @@ class BatchInstallAgentService @Autowired constructor(
             loginPassword = if (loginPassword.isNullOrBlank()) {
                 null
             } else {
-                    AESUtil.encrypt(batchInstallAesKey, loginPassword)
+                AESUtil.encrypt(batchInstallAesKey, loginPassword)
             },
             installType = installType,
             reInstallId = reInstallId,
@@ -182,7 +182,7 @@ class BatchInstallAgentService @Autowired constructor(
         return Triple(decodeSub[0], decodeSub[1], null)
     }
 
-    private fun genNewAgent(
+    fun genNewAgent(
         projectId: String,
         userId: String,
         os: OS,
@@ -206,7 +206,7 @@ class BatchInstallAgentService @Autowired constructor(
         )
     }
 
-    fun genCreateAgentInstallScript(
+    fun genCreateAgentId(
         userId: String,
         projectId: String,
         workspaceName: String,
@@ -221,19 +221,6 @@ class BatchInstallAgentService @Autowired constructor(
             createWorkspaceName = workspaceName
         )
         return HashUtil.encodeLongId(agentId)
-    }
-
-    fun genCreateAgentInstallScriptByDeviceId(
-        deviceId: String,
-        os: OS
-    ): String {
-        // TODO: 通过deviceId获取用户和项目信息，这里要考虑下权限相关的
-        return genCreateAgentInstallScript(
-            userId = TODO(),
-            projectId = TODO(),
-            workspaceName = deviceId,
-            os = os
-        )
     }
 
     companion object {
