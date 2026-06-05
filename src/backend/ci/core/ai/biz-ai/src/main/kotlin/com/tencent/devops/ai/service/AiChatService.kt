@@ -301,12 +301,6 @@ class AiChatService @Autowired constructor(
         threadId: String?,
         runId: String?
     ) {
-        logger.info(
-            "[AguiChat] outgoing event: threadId={}, runId={}, summary={}",
-            threadId,
-            runId,
-            summarizeAguiEvent(event)
-        )
         val encoded = encoder.encode(event)
         val sanitizedEncoded = AguiEventSanitizer.sanitizeEncodedEvent(encoded)
         if (sanitizedEncoded == null) {
@@ -559,39 +553,5 @@ class AiChatService @Autowired constructor(
 
         /** 会话被中途打断时的 ASSISTANT 占位文案，避免历史会话末尾停留在 USER。 */
         private const val ASSISTANT_TERMINATED_PLACEHOLDER = "本次回答已中止。"
-
-        private fun summarizeAguiEvent(event: AguiEvent): String {
-            return when (event) {
-                is AguiEvent.Custom -> {
-                    val data = event.value as? Map<*, *>
-                    val eventType = data?.get("eventType")
-                    val content = summarizeContent(data?.get("content")?.toString())
-                    "Custom(name=${event.name}, eventType=$eventType, isLast=${data?.get("isLast")}, content=$content)"
-                }
-
-                is AguiEvent.TextMessageContent ->
-                    "TextMessageContent(delta=${summarizeContent(event.delta)})"
-
-                is AguiEvent.ReasoningMessageContent ->
-                    "ReasoningMessageContent(delta=${summarizeContent(event.delta)})"
-
-                is AguiEvent.Raw ->
-                    "Raw(payload=${summarizeContent(event.toString())})"
-
-                else -> event.javaClass.simpleName
-            }
-        }
-
-        private fun summarizeContent(content: String?): String {
-            if (content.isNullOrBlank()) {
-                return "-"
-            }
-            val normalized = content.replace(Regex("\\s+"), " ").trim()
-            return if (normalized.length <= 120) {
-                normalized
-            } else {
-                normalized.take(120) + "...(truncated)"
-            }
-        }
     }
 }
