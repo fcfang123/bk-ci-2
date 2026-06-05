@@ -101,7 +101,7 @@ class ExternalAgentService @Autowired constructor(
         )
         logger.info(
             "[ExternalAgent] Creating: id={}, userId={}, " +
-                "name={}, platform={}",
+                    "name={}, platform={}",
             id, userId, request.agentName, platform.name
         )
         dao.create(
@@ -323,7 +323,11 @@ class ExternalAgentService @Autowired constructor(
             platform = platform,
             agentId = record.agentId,
             apiUrl = record.apiUrl,
-            authConfig = if (maskHeaders) adapterMap[platform]?.maskAuthConfig(authConfig) ?: authConfig else authConfig,
+            authConfig = if (maskHeaders) {
+                adapterMap[platform]?.maskAuthConfig(authConfig) ?: authConfig
+            } else {
+                authConfig
+            },
             headers = if (maskHeaders) maskHeaderValues(decryptedHeaders) else decryptedHeaders,
             enabled = record.enabled,
             createdTime = record.createdTime
