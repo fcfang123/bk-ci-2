@@ -29,26 +29,13 @@ package com.tencent.devops.ai.pojo
 
 import io.swagger.v3.oas.annotations.media.Schema
 
-@Schema(title = "外部智能体-更新请求")
-data class ExternalAgentUpdate(
-    @get:Schema(title = "显示名称", required = false)
-    val agentName: String? = null,
-    @get:Schema(title = "能力描述", required = false)
-    val description: String? = null,
-    @get:Schema(title = "平台类型", required = false)
-    val platform: ExternalAgentPlatform? = null,
+@Schema(title = "外部智能体-结构化认证配置")
+data class ExternalAgentAuthConfig(
+    @get:Schema(title = "认证模式，仅 BKAIDEV 使用", example = "USER")
+    val authMode: ExternalAgentAuthMode? = null,
     @get:Schema(
-        title = "平台上的Agent ID",
-        description = "KNOT 可从 apiUrl 最后一段自动提取，BKAIDEV 未传时默认使用 agentName",
-        required = false
+        title = "动态字段值",
+        description = "前端根据平台元数据返回的字段 key 组装；当前用户字段由后端自动填充，无需传值"
     )
-    val agentId: String? = null,
-    @get:Schema(title = "API端点URL", required = false)
-    val apiUrl: String? = null,
-    @get:Schema(title = "结构化认证配置", required = false)
-    val authConfig: ExternalAgentAuthConfig? = null,
-    @get:Schema(title = "认证头JSON", description = "兼容旧版本，未传 authConfig 时使用", required = false)
-    val headers: String? = null,
-    @get:Schema(title = "是否启用", required = false)
-    val enabled: Boolean? = null
+    val values: Map<String, String> = emptyMap()
 )

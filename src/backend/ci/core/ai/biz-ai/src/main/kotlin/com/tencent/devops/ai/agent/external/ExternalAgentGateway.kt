@@ -1,0 +1,228 @@
+package com.tencent.devops.ai.agent.external
+
+import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
+import com.tencent.devops.ai.service.ExternalAgentService
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Service
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.publisher.Signal
+import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+
+@Service
+class ExternalAgentGateway @Autowired constructor(
+    private val externalAgentService: ExternalAgentService,
+    adapters: List<ExternalAgentAdapter>,
+    private val properties: ExternalAgentGatewayProperties
+) {
+
+    private val adapterMap = adapters.associateBy { it.platform() }
+
+    fun stream(
+        userId: String,
+        configId: String,
+        input: ExternalAgentInput
+    ): Flux<ExternalAgentEvent> {
+        if (!properties.enabled) {
+            return Flux.error(ExternalAgentErrors.gatewayDisabled())
+        }
+
+        val config = externalAgentService.getEnabled(userId = userId, configId = configId)
+        val platform = config.platform
+        val adapter = adapterMap[platform] ?: return Flux.error(ExternalAgentErrors.unsupportedPlatform())
+
+        logger.info(
+            "[ExternalAgentGateway] stream start: userId={}, configId={}, platform={}, threadId={}, runId={}",
+            userId, configId, config.platform.name, input.threadId, input.runId
+        )
+
+        val responseChars = AtomicInteger(0)
+        val eventCount = AtomicInteger(0)
+        val eventTypeCounts = ConcurrentHashMap<String, AtomicInteger>()
+        val firstTokenRecorded = AtomicBoolean(false)
+        val startedAt = System.currentTimeMillis()
+        val externalRequest = ExternalAgentRequest(
+            userId = userId,
+            config = config,
+            query = input.query,
+            conversationId = input.conversationId,
+            threadId = input.threadId,
+            runId = input.runId,
+            chatHistory = input.chatHistory
+        )
+
+        val firstTokenTimeout = Duration.ofSeconds(properties.firstTokenTimeoutSeconds)
+        val streamTimeout = Duration.ofSeconds(properties.streamTimeoutSeconds)
+        val stream = adapter.stream(externalRequest).timeout(Mono.delay(firstTokenTimeout))
+        return withTotalTimeout(stream, streamTimeout).doOnNext { event ->
+            recordFirstToken(
+                recorded = firstTokenRecorded,
+                startedAt = startedAt,
+                userId = userId,
+                configId = configId,
+                platform = config.platform.name,
+                input = input
+            )
+            recordEventType(eventCount, eventTypeCounts, event)
+            recordEventSize(responseChars, event)
+        }.doOnCancel {
+            logger.info(
+                "[ExternalAgentGateway] stream cancelled: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, category={}",
+                userId,
+                configId,
+                config.platform.name,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                ExternalAgentErrorCategory.CANCELLED
+            )
+        }.doOnComplete {
+            val eventSummary = eventTypeCounts.entries
+                .sortedBy { it.key }
+                .joinToString(",") { "${it.key}=${it.value.get()}" }
+            if (responseChars.get() == 0) {
+                logger.warn(
+                    "[ExternalAgentGateway] stream completed without text delta: userId={}, configId={}, " +
+                            "platform={}, threadId={}, runId={}, totalMs={}, events={}, eventSummary={}",
+                    userId,
+                    configId,
+                    config.platform.name,
+                    input.threadId,
+                    input.runId,
+                    System.currentTimeMillis() - startedAt,
+                    eventCount.get(),
+                    eventSummary
+                )
+            }
+            logger.info(
+                "[ExternalAgentGateway] stream complete: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, events={}, eventSummary={}",
+                userId,
+                configId,
+                config.platform.name,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                eventCount.get(),
+                eventSummary
+            )
+        }.onErrorMap { error ->
+            if (error is ExternalAgentGatewayException) {
+                error
+            } else if (error is TimeoutException) {
+                gatewayError(ExternalAgentErrors.gatewayTimeout(), error)
+            } else {
+                gatewayError(ExternalAgentErrors.gatewayUpstreamFailed(), error)
+            }
+        }.doOnError { error ->
+            val category = (error as? ExternalAgentGatewayException)?.category
+                ?: ExternalAgentErrorCategory.UPSTREAM_ERROR
+            val rootCause = error.cause
+            logger.warn(
+                "[ExternalAgentGateway] stream failed: userId={}, configId={}, platform={}, " +
+                        "threadId={}, runId={}, totalMs={}, size={}, category={}, errorType={}, " +
+                        "error={}, causeType={}, cause={}",
+                userId,
+                configId,
+                config.platform.name,
+                input.threadId,
+                input.runId,
+                System.currentTimeMillis() - startedAt,
+                responseChars.get(),
+                category,
+                error.javaClass.simpleName,
+                error.message,
+                rootCause?.javaClass?.simpleName,
+                rootCause?.message
+            )
+        }
+    }
+
+    private fun withTotalTimeout(
+        stream: Flux<ExternalAgentEvent>,
+        timeout: Duration
+    ): Flux<ExternalAgentEvent> {
+        val timeoutSignal = Mono.delay(timeout)
+            .map<Signal<ExternalAgentEvent>> { Signal.error(timeoutException()) }
+        return Flux.merge(stream.materialize(), timeoutSignal)
+            .takeUntil { it.isOnComplete || it.isOnError }
+            .dematerialize()
+    }
+
+    private fun timeoutException(): ExternalAgentGatewayException {
+        return ExternalAgentErrors.gatewayTimeout()
+    }
+
+    private fun gatewayError(
+        exception: ExternalAgentGatewayException,
+        cause: Throwable
+    ): ExternalAgentGatewayException {
+        return exception.apply {
+            initCause(cause)
+        }
+    }
+
+    private fun recordFirstToken(
+        recorded: AtomicBoolean,
+        startedAt: Long,
+        userId: String,
+        configId: String,
+        platform: String,
+        input: ExternalAgentInput
+    ) {
+        if (!recorded.compareAndSet(false, true)) {
+            return
+        }
+        logger.info(
+            "[ExternalAgentGateway] first token: userId={}, configId={}, platform={}, " +
+                    "threadId={}, runId={}, firstTokenMs={}",
+            userId,
+            configId,
+            platform,
+            input.threadId,
+            input.runId,
+            System.currentTimeMillis() - startedAt
+        )
+    }
+
+    private fun recordEventSize(
+        responseChars: AtomicInteger,
+        event: ExternalAgentEvent
+    ) {
+        if (event !is ExternalAgentEvent.TextDelta) {
+            return
+        }
+        val currentSize = responseChars.addAndGet(event.delta.length)
+        if (currentSize > properties.maxResponseChars) {
+            throw ExternalAgentErrors.gatewayResponseTooLarge()
+        }
+    }
+
+    private fun recordEventType(
+        eventCount: AtomicInteger,
+        eventTypeCounts: ConcurrentHashMap<String, AtomicInteger>,
+        event: ExternalAgentEvent
+    ) {
+        eventCount.incrementAndGet()
+        val eventType = when (event) {
+            is ExternalAgentEvent.TextDelta -> "text_delta"
+            is ExternalAgentEvent.ConversationId -> "conversation_id"
+            is ExternalAgentEvent.Custom -> "custom:${event.eventType}"
+            is ExternalAgentEvent.Error -> "error:${event.category}"
+            ExternalAgentEvent.Done -> "done"
+        }
+        eventTypeCounts.computeIfAbsent(eventType) { AtomicInteger(0) }.incrementAndGet()
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(ExternalAgentGateway::class.java)
+    }
+}
