@@ -65,5 +65,6 @@ enum class ExternalAgentErrorCategory {
 
 class ExternalAgentGatewayException(
     val category: ExternalAgentErrorCategory,
-    override val message: String
-) : RuntimeException(message)
+    val errorCode: String,
+    val params: Array<String>? = null,
+) : RuntimeException(ExternalAgentErrors.resolveMessage(errorCode, params))
