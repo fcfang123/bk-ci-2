@@ -30,6 +30,7 @@ package com.tencent.devops.ai.resources
 import com.tencent.devops.ai.api.user.UserAiExternalAgentResource
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
+import com.tencent.devops.ai.pojo.ExternalAgentPlatformConfigInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.ai.service.ExternalAgentService
 import com.tencent.devops.common.api.pojo.Result
@@ -47,6 +48,10 @@ class UserAiExternalAgentResourceImpl @Autowired constructor(
         request: ExternalAgentCreate
     ): Result<ExternalAgentInfo> {
         return Result(externalAgentService.create(userId, request))
+    }
+
+    override fun listPlatformConfigs(userId: String): Result<List<ExternalAgentPlatformConfigInfo>> {
+        return Result(externalAgentService.listPlatformConfigs())
     }
 
     override fun list(userId: String): Result<List<ExternalAgentInfo>> {

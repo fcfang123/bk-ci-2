@@ -1,6 +1,7 @@
 package com.tencent.devops.ai.config
 
 import com.tencent.devops.ai.properties.AiLlmProperties
+import com.tencent.devops.ai.properties.ExternalAgentGatewayProperties
 import org.springframework.boot.autoconfigure.AutoConfigureOrder
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -11,5 +12,8 @@ import org.springframework.core.Ordered
 @Configuration
 @ConditionalOnWebApplication
 @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
-@EnableConfigurationProperties(AiLlmProperties::class)
+@EnableConfigurationProperties(
+    AiLlmProperties::class,
+    ExternalAgentGatewayProperties::class
+)
 class AiModelConfig
