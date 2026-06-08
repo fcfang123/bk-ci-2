@@ -27,10 +27,21 @@
 
 package com.tencent.devops.repository.sdk.tapd.service
 
-import com.tencent.devops.scm.pojo.tapd.TapdResult
-import com.tencent.devops.repository.sdk.tapd.request.StatusMapRequest
+import com.tencent.devops.scm.pojo.tapd.TapdBug
+import com.tencent.devops.scm.pojo.tapd.TapdStory
 
-interface ITapdWorkflowService {
+/**
+ * TAPD 业务对象（需求/缺陷）查询服务
+ */
+interface ITapdItemService {
 
-    fun getWorkflowStatusMap(request: StatusMapRequest): TapdResult<Map<String, String>>
+    /**
+     * 查询 TAPD 需求详情
+     */
+    fun getStoryInfo(workspaceId: String, storyId: String): TapdStory?
+
+    /**
+     * 查询 TAPD 缺陷详情
+     */
+    fun getBugInfo(workspaceId: String, bugId: String): TapdBug?
 }
