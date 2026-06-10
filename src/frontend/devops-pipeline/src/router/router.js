@@ -42,6 +42,9 @@ const TemplateOverview = () => import(/* webpackChunkName: "pipelinesTemplate" *
 const TemplateEdit = () => import(/* webpackChunkName: "pipelinesTemplate" */'../views/Template/TemplateEdit.vue')
 const InstanceEntry = () => import(/* webpackChunkName: "pipelinesTemplate" */'../views/Template/Instance/InstanceEntry.vue')
 
+// 流水线公共变量
+const PublicVarList = () => import(/* webpackChunkName: "pipelinesNewList" */'../views/PublicVariable/')
+
 // 客户端流水线任务子页 - subpages
 const pipelinesEntry = () => import(/* webpackChunkName: "pipelinesEntry" */'../views/subpages')
 
@@ -113,6 +116,12 @@ const routes = [
                                 component: TemplateList
                             }
                         ]
+                    },
+                    {
+                        path: 'publicVariable',
+                        name: 'PublicVarList',
+                        component: PublicVarList,
+                        
                     },
                     {
                         path: 'listAuth/:id/:groupName',
