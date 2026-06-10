@@ -279,11 +279,16 @@ class TapdWebhookRequestService(
                 bugInfo?.let {
                     val map = mutableMapOf<String, String>()
                     // tapd bug priority 需要额外转化一下，hook里面是英文，但是界面显示又为中文
-                    if(!it.priorityLabel.isNullOrBlank()) {
-                        map[TAPD_KEY_PRIORITY_LABEL] = getBugFieldsInfo(workspaceId)
-                                ?.priorityLabel
-                                ?.options
-                                ?.get(it.priorityLabel) ?: ""
+                    if (!it.priorityLabel.isNullOrBlank()) {
+                        getBugFieldsInfo(workspaceId)?.let { fieldsInfo ->
+                            logger.info(
+                                "getBugFieldsInfo|${it.priorityLabel}|" +
+                                        "${JsonUtil.toJson(fieldsInfo, false)}"
+                            )
+                            map[TAPD_KEY_PRIORITY_LABEL] = fieldsInfo.priorityLabel
+                                    ?.options
+                                    ?.get(it.priorityLabel) ?: ""
+                        }
                     }
                     map[TAPD_KEY_LABEL] = it.label ?: ""
                     map[TAPD_KEY_OWNER] = (it.currentOwner?.removeSuffix(";") ?: "")
