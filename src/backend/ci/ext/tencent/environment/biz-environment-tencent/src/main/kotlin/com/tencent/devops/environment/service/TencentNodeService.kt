@@ -22,6 +22,7 @@ import com.tencent.devops.environment.pojo.imate.ImateListItem
 import com.tencent.devops.environment.pojo.imate.ImateOriginEngine
 import com.tencent.devops.environment.pojo.imate.ImportImageNodeData
 import com.tencent.devops.environment.service.thirdpartyagent.BatchInstallAgentService
+import com.tencent.devops.project.api.service.ServiceProjectResource
 import com.tencent.devops.support.api.service.ServiceIMateResource
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
@@ -63,15 +64,17 @@ class TencentNodeService @Autowired constructor(
         userId: String,
         projectId: String
     ): List<ImateListItem> {
+        checkProjectScope(userId, projectId)
         // 只能导入自己创建的团队的
+        // TODO: 测试环境方便测试不校验团队和已安装
         val imateList =
             client.get(ServiceIMateResource::class).queryUserRobots(userId).data?.filter { it.username == userId }
-                ?.filter { ImateOriginEngine.teamType(it.clientType) }
+//                ?.filter { ImateOriginEngine.teamType(it.clientType) }
                 ?: return emptyList()
-        val installedAgents =
-            thirdPartyAgentDao.getAgentByWorkspaceName(dslContext, projectId, imateList.map { it.clientUuid }.toList())
-                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
-                .map { it.createWorkspaceName }
+        val installedAgents = emptyList<String>()
+//            thirdPartyAgentDao.getAgentByWorkspaceName(dslContext, projectId, imateList.map { it.clientUuid }.toList())
+//                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
+//                .map { it.createWorkspaceName }
         return imateList.filter { it.clientUuid !in installedAgents }.map {
             ImateListItem(
                 name = it.botName,
@@ -90,6 +93,7 @@ class TencentNodeService @Autowired constructor(
         projectId: String,
         data: ImportImageNodeData
     ): Boolean {
+        checkProjectScope(userId, projectId)
         data.agentList.forEach { imate ->
             // 校验是否有权限
             if (!environmentPermissionService.checkNodePermission(userId, projectId, AuthPermission.CREATE)) {
@@ -118,7 +122,7 @@ class TencentNodeService @Autowired constructor(
                     zoneName = data.zoneName,
                     agentType = AgentType.CREATE,
                     createWorkspaceName = imate.deviceId,
-                    agentProps = AgentProps.emptyBySource(AgentPropsSource.DEVCOUD)
+                    agentProps = AgentProps.emptyBySource(AgentPropsSource.DEVCLOUD)
                 )
             }
             // 生成临时1小时TOKEN用来导入鉴权
@@ -223,6 +227,19 @@ class TencentNodeService @Autowired constructor(
         needCheckRenameAgents.forEach { (projectId, nodeIdAndBotName) ->
             agentDao.batchUpdateNodeDisplayName(dslContext, projectId, nodeIdAndBotName)
             logger.info("doCheckImateProps update displayName $projectId|$nodeIdAndBotName")
+        }
+    }
+
+
+    // 校验不是个人项目
+    private fun checkProjectScope(userId: String, projectId: String) {
+        if (client.get(ServiceProjectResource::class).get(projectId).data?.projectScope != 0) {
+            throw PermissionForbiddenException(
+                message = I18nUtil.getCodeLanMessage(
+                    EnvironmentMessageCode.ERROR_ENV_NO_VIEW_PERMISSSION,
+                    language = I18nUtil.getLanguage(userId)
+                )
+            )
         }
     }
 
