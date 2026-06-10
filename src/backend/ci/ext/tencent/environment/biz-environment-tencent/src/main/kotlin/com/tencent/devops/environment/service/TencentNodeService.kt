@@ -66,14 +66,15 @@ class TencentNodeService @Autowired constructor(
     ): List<ImateListItem> {
         checkProjectScope(userId, projectId)
         // 只能导入自己创建的团队的
+        // TODO: 测试环境方便测试不校验团队和已安装
         val imateList =
             client.get(ServiceIMateResource::class).queryUserRobots(userId).data?.filter { it.username == userId }
-                ?.filter { ImateOriginEngine.teamType(it.clientType) }
+//                ?.filter { ImateOriginEngine.teamType(it.clientType) }
                 ?: return emptyList()
-        val installedAgents =
-            thirdPartyAgentDao.getAgentByWorkspaceName(dslContext, projectId, imateList.map { it.clientUuid }.toList())
-                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
-                .map { it.createWorkspaceName }
+        val installedAgents = emptyList<String>()
+//            thirdPartyAgentDao.getAgentByWorkspaceName(dslContext, projectId, imateList.map { it.clientUuid }.toList())
+//                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
+//                .map { it.createWorkspaceName }
         return imateList.filter { it.clientUuid !in installedAgents }.map {
             ImateListItem(
                 name = it.botName,
