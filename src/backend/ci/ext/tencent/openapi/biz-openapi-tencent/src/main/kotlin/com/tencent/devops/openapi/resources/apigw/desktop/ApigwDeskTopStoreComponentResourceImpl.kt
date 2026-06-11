@@ -92,6 +92,8 @@ class ApigwDeskTopStoreComponentResourceImpl @Autowired constructor(private val 
     }
 
     override fun getUserComponentDeployInfos(
+        appCode: String?,
+        apigwType: String?,
         userId: String,
         storeType: String,
         projectCode: String?,

@@ -155,6 +155,12 @@ interface ApigwDeskTopStoreComponentResource {
     @Path("/types/{storeType}/component/deploy/list")
     @GET
     fun getUserComponentDeployInfos(
+        @Parameter(description = "appCode", required = true)
+        @HeaderParam(AUTH_HEADER_DEVOPS_APP_CODE)
+        appCode: String?,
+        @Parameter(description = "apigw Type", required = true)
+        @PathParam("apigwType")
+        apigwType: String?,
         @Parameter(description = "userId", required = true)
         @HeaderParam(AUTH_HEADER_USER_ID)
         userId: String,
