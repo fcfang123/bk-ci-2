@@ -216,7 +216,6 @@
 
             async handleImport () {
                 if (this.selectedNodes.length === 0) return
-                this.step = 'success'
                 this.importLoading = true
                 try {
                     const res = await this.$store.dispatch('environment/batchImportImateNodes', {
