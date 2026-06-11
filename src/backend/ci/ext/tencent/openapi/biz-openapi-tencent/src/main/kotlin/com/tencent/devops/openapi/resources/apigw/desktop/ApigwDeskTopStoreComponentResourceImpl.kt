@@ -16,6 +16,7 @@ import com.tencent.devops.store.pojo.common.MarketItem
 import com.tencent.devops.store.pojo.common.MarketMainItem
 import com.tencent.devops.store.pojo.common.StoreDetailInfo
 import com.tencent.devops.store.pojo.common.UnInstallReq
+import com.tencent.devops.store.pojo.common.deploy.UserComponentDeployInfo
 import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
@@ -85,6 +86,26 @@ class ApigwDeskTopStoreComponentResourceImpl @Autowired constructor(private val 
             sortType = sortType,
             instanceId = instanceId,
             queryTestFlag = queryTestFlag,
+            page = page,
+            pageSize = pageSize
+        )
+    }
+
+    override fun getUserComponentDeployInfos(
+        userId: String,
+        storeType: String,
+        projectCode: String?,
+        instanceId: String?,
+        keyword: String?,
+        page: Int,
+        pageSize: Int
+    ): Result<Page<UserComponentDeployInfo>> {
+        return client.get(ServiceStoreComponentResource::class).getUserComponentDeployInfos(
+            userId = userId,
+            storeType = storeType,
+            projectCode = projectCode,
+            instanceId = instanceId,
+            keyword = keyword,
             page = page,
             pageSize = pageSize
         )
