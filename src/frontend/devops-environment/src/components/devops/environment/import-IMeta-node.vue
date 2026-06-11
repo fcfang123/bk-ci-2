@@ -227,7 +227,7 @@
                             agentList: this.selectedNodes.map(deviceId => ({ deviceId }))
                         }
                     })
-                    if (res && res.data) {
+                    if (res) {
                         this.importResultCount = this.selectedNodes.length
                         this.step = 'success'
                         this.$emit('import-success')
