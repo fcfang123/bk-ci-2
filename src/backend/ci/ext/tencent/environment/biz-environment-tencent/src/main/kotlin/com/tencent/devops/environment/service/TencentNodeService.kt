@@ -83,7 +83,9 @@ class TencentNodeService @Autowired constructor(
                 // 暂时只有linux，未来有了再加，他们的接口没字段
                 os = OS.LINUX,
                 engine = ImateOriginEngine.toEngine(it.clientType),
-                status = it.status
+                status = it.status,
+                createUser = it.username,
+                createTime = it.createdAt
             )
         }
     }
@@ -134,7 +136,7 @@ class TencentNodeService @Autowired constructor(
                 clientUuid = imate.deviceId,
                 token = token
             )
-            logger.info("batchImportImateNodes install plugin $taskId")
+            logger.info("batchImportImateNodes install plugin ${projectId}|${imate.deviceId}|$userId|$taskId")
         }
         return true
     }
