@@ -27,17 +27,20 @@
 
 package com.tencent.devops.ai.service
 
-import com.fasterxml.jackson.core.type.TypeReference
 import com.tencent.devops.ai.constant.AiMessageCode
-import com.tencent.devops.ai.dao.ExternalAgentConfigDao
 import com.tencent.devops.ai.agent.external.ExternalAgentAdapter
+import com.tencent.devops.ai.agent.external.ExternalAgentAgentIdRecalculationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentAgentIdResolveContext
 import com.tencent.devops.ai.agent.external.ExternalAgentConfigValidationContext
+import com.tencent.devops.ai.agent.external.ExternalAgentAuthHeadersBuildContext
+import com.tencent.devops.ai.agent.external.ExternalAgentErrors
 import com.tencent.devops.ai.agent.external.ExternalAgentGatewayException
+import com.tencent.devops.ai.dao.ExternalAgentConfigDao
 import com.tencent.devops.ai.pojo.ExternalAgentAuthConfig
-import com.tencent.devops.ai.pojo.ExternalAgentAuthMode
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.pojo.ExternalAgentPlatform
+import com.tencent.devops.ai.pojo.ExternalAgentPlatformConfigInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.util.AESUtil
@@ -65,26 +68,40 @@ class ExternalAgentService @Autowired constructor(
 
     private val adapterMap = adapters.associateBy { it.platform() }
 
+    fun listPlatformConfigs(): List<ExternalAgentPlatformConfigInfo> {
+        return adapterMap.values
+            .mapNotNull { it.platformConfigInfo() }
+            .sortedBy { it.platform.ordinal }
+    }
+
     fun create(
         userId: String,
         request: ExternalAgentCreate
     ): ExternalAgentInfo {
         val id = UUIDUtil.generate()
         val platform = request.platform
+        val adapter = getAdapter(platform)
+        val effectiveAgentId = resolveAgentId(
+            adapter = adapter,
+            rawAgentId = request.agentId,
+            agentName = request.agentName,
+            apiUrl = request.apiUrl
+        )
         val assembledHeaders = resolveHeaders(
-            platform = platform,
+            userId = userId,
+            adapter = adapter,
             headers = request.headers,
             authConfig = request.authConfig
         )
         validateConfig(
             platform = platform.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId,
             apiUrl = request.apiUrl,
             headers = assembledHeaders
         )
         logger.info(
             "[ExternalAgent] Creating: id={}, userId={}, " +
-                "name={}, platform={}",
+                    "name={}, platform={}",
             id, userId, request.agentName, platform.name
         )
         dao.create(
@@ -94,16 +111,14 @@ class ExternalAgentService @Autowired constructor(
             agentName = request.agentName,
             description = request.description,
             platform = platform.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId,
             apiUrl = request.apiUrl,
             headers = encryptHeaders(assembledHeaders),
             enabled = request.enabled
         )
         val record = dao.getById(dslContext, id)
             ?: throw ErrorCodeException(
-                errorCode = AiMessageCode.CREATE_EXTERNAL_AGENT_FAILED,
-                defaultMessage =
-                    "Failed to create external agent config"
+                errorCode = AiMessageCode.CREATE_EXTERNAL_AGENT_FAILED
             )
         return toInfo(record, maskHeaders = true)
     }
@@ -127,8 +142,7 @@ class ExternalAgentService @Autowired constructor(
         if (!record.enabled) {
             throw ErrorCodeException(
                 statusCode = 403,
-                errorCode = AiMessageCode.EXTERNAL_AGENT_NO_PERMISSION,
-                defaultMessage = "External agent config is disabled",
+                errorCode = AiMessageCode.EXTERNAL_AGENT_CONFIG_DISABLED,
                 params = arrayOf(configId)
             )
         }
@@ -148,7 +162,7 @@ class ExternalAgentService @Autowired constructor(
             return exactNameMatches.single().id
         }
         if (exactNameMatches.size > 1) {
-            throw invalidConfig("存在多个同名外部智能体，请改用配置 ID 调用")
+            throw invalidConfig(AiMessageCode.EXTERNAL_AGENT_DUPLICATE_NAME)
         }
 
         val ignoreCaseNameMatches = enabledConfigs.filter {
@@ -158,13 +172,12 @@ class ExternalAgentService @Autowired constructor(
             return ignoreCaseNameMatches.single().id
         }
         if (ignoreCaseNameMatches.size > 1) {
-            throw invalidConfig("存在多个名称近似的外部智能体，请改用配置 ID 调用")
+            throw invalidConfig(AiMessageCode.EXTERNAL_AGENT_DUPLICATE_SIMILAR_NAME)
         }
 
         throw ErrorCodeException(
             statusCode = 404,
             errorCode = AiMessageCode.EXTERNAL_AGENT_NOT_FOUND,
-            defaultMessage = "External agent config not found",
             params = arrayOf(configIdOrName)
         )
     }
@@ -181,16 +194,30 @@ class ExternalAgentService @Autowired constructor(
         val record = getOwnedRecord(userId, configId)
         val currentHeaders = decryptHeaders(record.headers)
         val effectivePlatform = request.platform ?: ExternalAgentPlatform.fromValue(record.platform)
+        val adapter = getAdapter(effectivePlatform)
+        val effectiveAgentName = request.agentName ?: record.agentName
+        val effectiveApiUrl = request.apiUrl ?: record.apiUrl
+        val effectiveAgentId = if (shouldRecalculateAgentId(adapter, request)) {
+            resolveAgentId(
+                adapter = adapter,
+                rawAgentId = request.agentId ?: record.agentId,
+                agentName = effectiveAgentName,
+                apiUrl = effectiveApiUrl
+            )
+        } else {
+            record.agentId
+        }
         val effectiveHeaders = resolveEffectiveHeaders(
-            platform = effectivePlatform,
+            userId = userId,
+            adapter = adapter,
             currentHeaders = currentHeaders,
             rawHeaders = request.headers,
             authConfig = request.authConfig
         )
         validateConfig(
             platform = effectivePlatform.name,
-            agentId = request.agentId ?: record.agentId,
-            apiUrl = request.apiUrl ?: record.apiUrl,
+            agentId = effectiveAgentId,
+            apiUrl = effectiveApiUrl,
             headers = effectiveHeaders
         )
         return dao.update(
@@ -199,10 +226,11 @@ class ExternalAgentService @Autowired constructor(
             agentName = request.agentName,
             description = request.description,
             platform = request.platform?.name,
-            agentId = request.agentId,
+            agentId = effectiveAgentId.takeIf { it != record.agentId },
             apiUrl = request.apiUrl,
             headers = resolveUpdatedEncryptedHeaders(
-                platform = effectivePlatform,
+                userId = userId,
+                adapter = adapter,
                 currentHeaders = currentHeaders,
                 rawHeaders = request.headers,
                 authConfig = request.authConfig
@@ -230,10 +258,9 @@ class ExternalAgentService @Autowired constructor(
         apiUrl: String,
         headers: String?
     ) {
-        val adapter = adapterMap[ExternalAgentPlatform.fromValue(platform)]
-            ?: throw invalidConfig("暂不支持该外部智能体平台")
+        val adapter = getAdapter(ExternalAgentPlatform.fromValue(platform))
         if (agentId.isBlank()) {
-            throw invalidConfig("外部智能体 agentId 不能为空")
+            throw invalidConfig(AiMessageCode.EXTERNAL_AGENT_ID_REQUIRED)
         }
         try {
             adapter.validateConfig(
@@ -245,16 +272,20 @@ class ExternalAgentService @Autowired constructor(
                 )
             )
         } catch (e: ExternalAgentGatewayException) {
-            throw invalidConfig(e.message)
+            throw invalidConfig(e)
         }
     }
 
-    private fun invalidConfig(message: String?): ErrorCodeException {
+    private fun invalidConfig(errorCode: String, vararg params: String): ErrorCodeException {
         return ErrorCodeException(
             statusCode = 400,
-            errorCode = AiMessageCode.EXTERNAL_AGENT_CONFIG_INVALID,
-            defaultMessage = message ?: "External agent config is invalid"
+            errorCode = errorCode,
+            params = if (params.isEmpty()) null else arrayOf(*params)
         )
+    }
+
+    private fun invalidConfig(exception: ExternalAgentGatewayException): ErrorCodeException {
+        return ExternalAgentErrors.toErrorCodeException(exception)
     }
 
     private fun getOwnedRecord(
@@ -265,15 +296,12 @@ class ExternalAgentService @Autowired constructor(
             ?: throw ErrorCodeException(
                 statusCode = 404,
                 errorCode = AiMessageCode.EXTERNAL_AGENT_NOT_FOUND,
-                defaultMessage =
-                    "External agent config not found",
                 params = arrayOf(configId)
             )
         if (record.userId != userId) {
             throw ErrorCodeException(
                 statusCode = 403,
                 errorCode = AiMessageCode.EXTERNAL_AGENT_NO_PERMISSION,
-                defaultMessage = "No permission",
                 params = arrayOf(configId)
             )
         }
@@ -286,7 +314,7 @@ class ExternalAgentService @Autowired constructor(
     ): ExternalAgentInfo {
         val decryptedHeaders = decryptHeaders(record.headers)
         val platform = ExternalAgentPlatform.fromValue(record.platform)
-        val authConfig = parseAuthConfig(platform, decryptedHeaders)
+        val authConfig = adapterMap[platform]?.parseAuthConfig(decryptedHeaders)
         return ExternalAgentInfo(
             id = record.id,
             userId = record.userId,
@@ -295,7 +323,11 @@ class ExternalAgentService @Autowired constructor(
             platform = platform,
             agentId = record.agentId,
             apiUrl = record.apiUrl,
-            authConfig = if (maskHeaders) maskAuthConfig(authConfig) else authConfig,
+            authConfig = if (maskHeaders) {
+                adapterMap[platform]?.maskAuthConfig(authConfig) ?: authConfig
+            } else {
+                authConfig
+            },
             headers = if (maskHeaders) maskHeaderValues(decryptedHeaders) else decryptedHeaders,
             enabled = record.enabled,
             createdTime = record.createdTime
@@ -344,23 +376,25 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun resolveHeaders(
-        platform: ExternalAgentPlatform,
+        userId: String,
+        adapter: ExternalAgentAdapter,
         headers: String?,
         authConfig: ExternalAgentAuthConfig?
     ): String? {
-        return authConfig?.let { buildHeaders(platform, it) } ?: headers
+        return authConfig?.let { buildAuthHeaders(adapter, userId, it) } ?: headers
     }
 
     private fun resolveEffectiveHeaders(
-        platform: ExternalAgentPlatform,
+        userId: String,
+        adapter: ExternalAgentAdapter,
         currentHeaders: String?,
         rawHeaders: String?,
         authConfig: ExternalAgentAuthConfig?
     ): String? {
         return when {
             authConfig != null -> {
-                val existingAuthConfig = parseAuthConfig(platform, currentHeaders)
-                buildHeaders(platform, mergeAuthConfig(existingAuthConfig, authConfig))
+                val existingAuthConfig = adapter.parseAuthConfig(currentHeaders)
+                buildAuthHeaders(adapter, userId, mergeAuthConfig(existingAuthConfig, authConfig))
             }
 
             rawHeaders != null -> rawHeaders
@@ -369,126 +403,72 @@ class ExternalAgentService @Autowired constructor(
     }
 
     private fun resolveUpdatedEncryptedHeaders(
-        platform: ExternalAgentPlatform,
+        userId: String,
+        adapter: ExternalAgentAdapter,
         currentHeaders: String?,
         rawHeaders: String?,
         authConfig: ExternalAgentAuthConfig?
     ): String? {
         return when {
             authConfig != null -> {
-                val existingAuthConfig = parseAuthConfig(platform, currentHeaders)
-                resolveEncryptedHeaders(buildHeaders(platform, mergeAuthConfig(existingAuthConfig, authConfig)))
+                val existingAuthConfig = adapter.parseAuthConfig(currentHeaders)
+                resolveEncryptedHeaders(
+                    buildAuthHeaders(adapter, userId, mergeAuthConfig(existingAuthConfig, authConfig))
+                )
             }
 
             else -> resolveEncryptedHeaders(rawHeaders)
         }
     }
 
-    private fun buildHeaders(
-        platform: ExternalAgentPlatform,
+    private fun resolveAgentId(
+        adapter: ExternalAgentAdapter,
+        rawAgentId: String?,
+        agentName: String,
+        apiUrl: String
+    ): String {
+        return try {
+            adapter.resolveAgentId(
+                ExternalAgentAgentIdResolveContext(
+                    rawAgentId = rawAgentId,
+                    agentName = agentName,
+                    apiUrl = apiUrl
+                )
+            )
+        } catch (e: ExternalAgentGatewayException) {
+            throw invalidConfig(e)
+        }
+    }
+
+    private fun shouldRecalculateAgentId(
+        adapter: ExternalAgentAdapter,
+        request: ExternalAgentUpdate
+    ): Boolean {
+        return adapter.shouldRecalculateAgentId(
+            ExternalAgentAgentIdRecalculationContext(
+                platformChanged = request.platform != null,
+                agentIdChanged = request.agentId != null,
+                agentNameChanged = request.agentName != null,
+                apiUrlChanged = request.apiUrl != null
+            )
+        )
+    }
+
+    private fun buildAuthHeaders(
+        adapter: ExternalAgentAdapter,
+        userId: String,
         authConfig: ExternalAgentAuthConfig
     ): String? {
-        val headers = when (platform) {
-            ExternalAgentPlatform.BKAIDEV -> buildBkAiDevHeaders(authConfig)
-            ExternalAgentPlatform.KNOT -> buildKnotHeaders(authConfig)
-        }
-        return if (headers.isEmpty()) {
-            null
-        } else {
-            JsonUtil.toJson(headers)
-        }
-    }
-
-    private fun buildBkAiDevHeaders(authConfig: ExternalAgentAuthConfig): Map<String, String> {
-        val effectiveAuthMode = when {
-            authConfig.authMode != null -> authConfig.authMode
-            !authConfig.accessToken.isNullOrBlank() -> ExternalAgentAuthMode.USER
-            !authConfig.bkAppCode.isNullOrBlank() || !authConfig.bkAppSecret.isNullOrBlank() ->
-                ExternalAgentAuthMode.APP
-            else -> null
-        }
-        val authorization = when {
-            effectiveAuthMode == ExternalAgentAuthMode.APP -> JsonUtil.toJson(
-                mapOf(
-                    BKAIDEV_BK_APP_CODE_KEY to authConfig.bkAppCode,
-                    BKAIDEV_BK_APP_SECRET_KEY to authConfig.bkAppSecret
-                ).filterValues { !it.isNullOrBlank() },
-                false
+        return try {
+            adapter.buildAuthHeaders(
+                ExternalAgentAuthHeadersBuildContext(
+                    userId = userId,
+                    authConfig = authConfig
+                )
             )
-
-            effectiveAuthMode == ExternalAgentAuthMode.USER -> JsonUtil.toJson(
-                mapOf(BKAIDEV_ACCESS_TOKEN_KEY to authConfig.accessToken)
-                    .filterValues { !it.isNullOrBlank() },
-                false
-            )
-
-            else -> null
+        } catch (e: ExternalAgentGatewayException) {
+            throw invalidConfig(e)
         }
-        val headers = linkedMapOf<String, String>()
-        authorization?.let { headers[BKAIDEV_AUTHORIZATION_HEADER] = it }
-        val bkAiDevUser = authConfig.bkAiDevUser
-        if (effectiveAuthMode != ExternalAgentAuthMode.USER && !bkAiDevUser.isNullOrBlank()) {
-            headers[BKAIDEV_USER_HEADER] = bkAiDevUser
-        }
-        return headers
-    }
-
-    private fun buildKnotHeaders(authConfig: ExternalAgentAuthConfig): Map<String, String> {
-        return linkedMapOf<String, String>().apply {
-            authConfig.knotApiToken?.takeIf { it.isNotBlank() }?.let { put(KNOT_TOKEN_HEADER, it) }
-            authConfig.knotApiUser?.takeIf { it.isNotBlank() }?.let { put(KNOT_USER_HEADER, it) }
-        }
-    }
-
-    private fun parseAuthConfig(
-        platform: ExternalAgentPlatform,
-        headers: String?
-    ): ExternalAgentAuthConfig? {
-        val parsedHeaders = AiMcpServerService.parseHeaders(headers)
-        if (parsedHeaders.isEmpty()) {
-            return null
-        }
-        return when (platform) {
-            ExternalAgentPlatform.BKAIDEV -> parseBkAiDevAuthConfig(parsedHeaders)
-            ExternalAgentPlatform.KNOT -> parseKnotAuthConfig(parsedHeaders)
-        }
-    }
-
-    private fun parseBkAiDevAuthConfig(headers: Map<String, String>): ExternalAgentAuthConfig? {
-        val authorization = getHeaderIgnoreCase(headers, BKAIDEV_AUTHORIZATION_HEADER)
-        val user = getHeaderIgnoreCase(headers, BKAIDEV_USER_HEADER)
-        val authPayload = parseJsonMap(authorization)
-        if (authorization.isNullOrBlank() && user.isNullOrBlank()) {
-            return null
-        }
-        val accessToken = authPayload[BKAIDEV_ACCESS_TOKEN_KEY]
-        val bkAppCode = authPayload[BKAIDEV_BK_APP_CODE_KEY]
-        val bkAppSecret = authPayload[BKAIDEV_BK_APP_SECRET_KEY]
-        val authMode = when {
-            !accessToken.isNullOrBlank() -> ExternalAgentAuthMode.USER
-            !bkAppCode.isNullOrBlank() || !bkAppSecret.isNullOrBlank() || !user.isNullOrBlank() ->
-                ExternalAgentAuthMode.APP
-            else -> null
-        }
-        return ExternalAgentAuthConfig(
-            authMode = authMode,
-            bkAppCode = bkAppCode,
-            bkAppSecret = bkAppSecret,
-            accessToken = accessToken,
-            bkAiDevUser = user
-        )
-    }
-
-    private fun parseKnotAuthConfig(headers: Map<String, String>): ExternalAgentAuthConfig? {
-        val token = getHeaderIgnoreCase(headers, KNOT_TOKEN_HEADER)
-        val user = getHeaderIgnoreCase(headers, KNOT_USER_HEADER)
-        if (token.isNullOrBlank() && user.isNullOrBlank()) {
-            return null
-        }
-        return ExternalAgentAuthConfig(
-            knotApiToken = token,
-            knotApiUser = user
-        )
     }
 
     private fun mergeAuthConfig(
@@ -497,62 +477,25 @@ class ExternalAgentService @Autowired constructor(
     ): ExternalAgentAuthConfig {
         return ExternalAgentAuthConfig(
             authMode = incoming.authMode ?: current?.authMode,
-            bkAppCode = incoming.bkAppCode ?: current?.bkAppCode,
-            bkAppSecret = incoming.bkAppSecret ?: current?.bkAppSecret,
-            accessToken = incoming.accessToken ?: current?.accessToken,
-            bkAiDevUser = incoming.bkAiDevUser ?: current?.bkAiDevUser,
-            knotApiToken = incoming.knotApiToken ?: current?.knotApiToken,
-            knotApiUser = incoming.knotApiUser ?: current?.knotApiUser
+            values = current?.values.orEmpty() + incoming.values
         )
     }
 
-    private fun maskAuthConfig(authConfig: ExternalAgentAuthConfig?): ExternalAgentAuthConfig? {
-        if (authConfig == null) {
-            return null
-        }
-        return authConfig.copy(
-            bkAppSecret = authConfig.bkAppSecret?.let { MASKED_HEADER_VALUE },
-            accessToken = authConfig.accessToken?.let { MASKED_HEADER_VALUE },
-            knotApiToken = authConfig.knotApiToken?.let { MASKED_HEADER_VALUE }
-        )
-    }
-
-    private fun getHeaderIgnoreCase(
-        headers: Map<String, String>,
-        key: String
-    ): String? {
-        return headers.entries.firstOrNull { it.key.equals(key, ignoreCase = true) }?.value
-    }
-
-    private fun parseJsonMap(json: String?): Map<String, String> {
-        if (json.isNullOrBlank()) {
-            return emptyMap()
-        }
-        return try {
-            JsonUtil.to(json, object : TypeReference<Map<String, String>>() {})
-        } catch (ignored: Exception) {
-            emptyMap()
-        }
+    private fun getAdapter(platform: ExternalAgentPlatform): ExternalAgentAdapter {
+        return adapterMap[platform]
+            ?: throw invalidConfig(AiMessageCode.EXTERNAL_AGENT_UNSUPPORTED_PLATFORM)
     }
 
     private fun requireAesKey() {
         if (aesKey.isBlank()) {
             throw ErrorCodeException(
-                errorCode = AiMessageCode.USER_LLM_CONFIG_AES_KEY_MISSING,
-                defaultMessage = "config[aes.ai] is not found"
+                errorCode = AiMessageCode.USER_LLM_CONFIG_AES_KEY_MISSING
             )
         }
     }
 
     companion object {
         private const val MASKED_HEADER_VALUE = "******"
-        private const val BKAIDEV_AUTHORIZATION_HEADER = "X-Bkapi-Authorization"
-        private const val BKAIDEV_USER_HEADER = "X-BKAIDEV-USER"
-        private const val BKAIDEV_ACCESS_TOKEN_KEY = "access_token"
-        private const val BKAIDEV_BK_APP_CODE_KEY = "bk_app_code"
-        private const val BKAIDEV_BK_APP_SECRET_KEY = "bk_app_secret"
-        private const val KNOT_TOKEN_HEADER = "x-knot-api-token"
-        private const val KNOT_USER_HEADER = "x-knot-api-user"
         private val logger = LoggerFactory.getLogger(
             ExternalAgentService::class.java
         )

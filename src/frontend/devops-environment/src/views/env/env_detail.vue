@@ -100,19 +100,13 @@
                 fetchEnvDetail,
                 envDetailLoaded,
                 setEnvDetailLoaded,
-                projectId
+                projectId,
+                isPersonalProject
             } = useEnvDetail()
             const {
                 envList,
                 isCreateResType
             } = useEnvAside()
-
-            // 获取当前项目的 projectScope
-            const projectScope = computed(() => {
-                const projectList = proxy.$store.state.projectList || []
-                const curProject = projectList.find(p => p.projectCode === projectId.value)
-                return curProject?.projectScope
-            })
 
             const emptyInfo = ref({
                 title: proxy.$t('environment.envInfo.emptyEnv'),
@@ -160,6 +154,10 @@
                     name: 'node',
                     label: proxy.$t('environment.node')
                 },
+                {
+                    name: 'schedulingStrategy',
+                    label: proxy.$t('environment.schedulingStrategy')
+                },
                 ...(currentEnv.value?.envType === ENV_TYPE_MAP.BUILD ? [
                     {
                         name: 'variable',
@@ -194,7 +192,7 @@
                         label: proxy.$t('environment.advancedSetting')
                     }
                 ] : []),
-                ...(projectScope.value !== 1 ? [{
+                ...(!isPersonalProject.value ? [{
                     name: 'auth',
                     label: proxy.$t('environment.authManage')
                 }] : [])
@@ -322,6 +320,7 @@
     .env-name {
         flex: 0 1 auto;
         font-weight: 700;
+        flex: 0 1 auto;
         font-size: 14px;
         max-width: 300px;
         overflow: hidden;

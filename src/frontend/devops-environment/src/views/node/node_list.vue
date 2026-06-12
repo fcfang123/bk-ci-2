@@ -1,5 +1,6 @@
 <template>
     <div class="node-list-wrapper">
+        <router-view />
         <section
             class="sub-view-port"
             v-bkloading="{
@@ -67,6 +68,14 @@
                                     </li>
                                 </ul>
                             </bk-dropdown-menu>
+                        </template>
+                        <template v-else-if="isCreateResType && !isPersonalProject">
+                            <bk-button
+                                theme="primary"
+                                @click="handleImportIMetaNode"
+                            >
+                                {{ $t('environment.nodeInfo.importIMetaNode') }}
+                            </bk-button>
                         </template>
                         <bk-dropdown-menu
                             trigger="click"
@@ -145,7 +154,8 @@
                             v-model="dateTimeRange"
                             :placeholder="$t('environment.selectRecentExecutionTimeRange')"
                             :type="'datetimerange'"
-                            @change="handleDateRangeChange"
+                            @clear="handleClearDateRange"
+                            @pick-success="handleDateRangeChange"
                         >
                         </bk-date-picker>
                     </div>
@@ -216,6 +226,12 @@
             @cancelMakeMirror="makeMirrorConf.isShow = false"
             @submitMakeMirror="requestList"
         ></make-mirror-dialog>
+
+        <!-- 导入数字同事节点 -->
+        <import-i-meta-node
+            ref="importIMetaNode"
+            @import-success="requestList(queryParams)"
+        />
 
         <!-- 导入成功、失败提示弹框 -->
         <import-tips-dialog
@@ -397,8 +413,10 @@
     import { ENV_ACTIVE_NODE_TYPE, ALLNODE, SERVICE_RESOURCE_TYPE } from '@/store/constants'
     import CollapseLayout from '@/components/CollapseLayout'
     import useCollapseLayout from '@/hooks/useCollapseLayout'
+    import useEnvDetail from '@/hooks/useEnvDetail'
     import useUrlQuery from '@/hooks/useUrlQuery'
     import NodeDetail from './node_detail.vue'
+    import importIMetaNode from '@/components/devops/environment/import-IMeta-node.vue'
     export default {
         components: {
             thirdConstruct,
@@ -409,10 +427,12 @@
             ListTable,
             SearchSelect,
             CollapseLayout,
-            NodeDetail
+            NodeDetail,
+            importIMetaNode
         },
         setup () {
             const { flod, toggleFlod: originalToggleFlod, setFlod } = useCollapseLayout('node_list', false)
+            const { isPersonalProject } = useEnvDetail()
             const {
                 queryParams,
                 updateSearchValue,
@@ -446,10 +466,13 @@
                 updateSort,
                 updateNodeHashId,
                 getRequestParams,
-                getTagRequestParams
+                getTagRequestParams,
+                isPersonalProject
             }
         },
         data () {
+            const urlParams = this.queryParams
+            
             return {
                 ENV_ACTIVE_NODE_TYPE,
                 ALLNODE,
@@ -543,8 +566,9 @@
                 paginationData: {
                     current: urlParams.page || 1,
                     count: 0,
-                    limit: Number(localStorage.getItem(ENV_NODE_TABLE_LIMIT_CACHE)) || 10,
-                    limitList: [10, 50, 100, 200]
+                    limit: urlParams.pageSize || Number(localStorage.getItem(ENV_NODE_TABLE_LIMIT_CACHE)) || 10,
+                    limitList: [10, 50, 100, 200],
+                    showTotalCount: true
                 },
                 requestParams: {},
                 // 将时间戳转换为 Date 对象给日期组件使用
@@ -639,12 +663,34 @@
                             {
                                 id: 'NOT_INSTALLED',
                                 name: this.$t('environment.nodeStatusMap.NOT_INSTALLED')
+                            },
+                            {
+                                id: 'NOT_IN_CC',
+                                name: this.$t('environment.nodeStatusMap.NOT_IN_CC')
+                            },
+                            {
+                                id: 'NOT_IN_CMDB',
+                                name: this.$t('environment.nodeStatusMap.NOT_IN_CMDB')
                             }
                         ]
                     },
                     {
                         name: this.$t('environment.nodeInfo.agentVersion'),
                         id: 'agentVersion'
+                    },
+                    {
+                        name: this.$t('environment.nodeInfo.operatorStatus'),
+                        id: 'operatorStatus',
+                        children: [
+                            {
+                                id: 'NORMAL',
+                                name: this.$t('environment.operatorStatus.NORMAL')
+                            },
+                            {
+                                id: 'OPERATOR_CHANGED',
+                                name: this.$t('environment.operatorStatus.OPERATOR_CHANGED')
+                            }
+                        ]
                     },
                     {
                         name: this.$t('environment.lastModifier'),
@@ -686,7 +732,8 @@
                 })
             },
             filterPlaceHolder () {
-                return this.filterData.map(item => item.name).join(' / ')
+                const str = this.filterData.filter((i, index) => index < 7).map(item => item.name).join(' / ')
+                return this.$t('environment.filterNodeBy', [str])
             },
             installModeAsService () {
                 return this.constructImportForm.installType === 'SERVICE'
@@ -780,7 +827,15 @@
         },
         watch: {
             projectId: function () {
-                this.$router.push({ name: 'envList' })
+                this.$router.push({
+                    name: 'envDetail',
+                    params: {
+                        resType: this.$route.params.resType,
+                        envType: 'ALL',
+                        envId: undefined,
+                        tabName: undefined
+                    }
+                })
             },
             nodeTagList: {
                 immediate: true,
@@ -868,10 +923,13 @@
                             this.requestParams[i.id] = i.id
                         }
                     })
-                    this.pagination.current = 1
+                    this.paginationData.current = 1
+                    this.updatePagination(1, this.paginationData.limit)
                 } else {
                     this.requestParams = {}
                 }
+                // 同步到 URL
+                this.updateSearchValue(val)
                 this.requestList(this.requestParams)
             },
             isCreateResType: {
@@ -1071,10 +1129,12 @@
                         }
                     })
                     this.currentTags = tags
-                    this.pagination.current = 1
+                    this.paginationData.current = 1
                 } else {
                     this.syncCurrentTags()
                 }
+                // 同步到 URL
+                this.updateTagSearchValue(val)
                 this.requestList(this.requestParams)
             },
             async handleNodeTypeChange () {
@@ -1107,6 +1167,7 @@
             handleClearTagSearch () {
                 this.tagSearchValue = []
                 this.currentTags = []
+                this.updateTagSearchValue(null)
                 if (!this.currentNodeType && this.$route.params.nodeType !== ALLNODE) {
                     // 如果是 CreateResType，保持当前 nodeType 不变
                     if (this.isCreateResType) {
@@ -1129,8 +1190,12 @@
 
                 try {
                     await this.syncCurrentTags()
+                    // 确保分页参数始终同步到 URL（包括首次加载）
+                    this.updatePagination(this.paginationData.current, this.paginationData.limit)
                     setTimeout(() => {
-                        this.requestList()
+                        // 首次加载时使用 URL 参数
+                        const urlRequestParams = this.getRequestParams()
+                        this.requestList(urlRequestParams)
                     }, 500)
                 } catch (err) {
                     this.$bkMessage({
@@ -1149,6 +1214,10 @@
             async requestList (params = this.requestParams) {
                 try {
                     this.tableLoading = true
+                    
+                    // 获取标签参数（优先使用 URL 参数）
+                    const tagParams = this.getTagRequestParams()
+                    
                     const res = await this.$store.dispatch('environment/requestNodeList', {
                         projectId: this.projectId,
                         params: {
@@ -1160,10 +1229,10 @@
                                 nodeType: 'CREATE'
                             }: {})
                         },
-                        ...(this.currentTags.length ? { tags: this.currentTags } : {})
+                        ...(tagParams.length ? { tags: tagParams } : this.currentTags.length ? { tags: this.currentTags } : {})
                     })
 
-                    this.pagination.count = res.count
+                    this.paginationData.count = res.count
                     this.nodeList = res.records.map(i => {
                         return {
                             isEnableEdit: i.nodeHashId === this.curEditNodeItem,
@@ -1495,14 +1564,18 @@
                 this.selectedNodes = selection
             },
             handlePageChange (page) {
-                this.pagination.current = page
+                this.paginationData.current = page
+                // 同步到 URL
+                this.updatePagination(page, this.paginationData.limit)
                 this.requestList(this.requestParams)
             },
             
             handlePageLimitChange (limit) {
                 localStorage.setItem(ENV_NODE_TABLE_LIMIT_CACHE, limit)
-                this.pagination.current = 1
-                this.pagination.limit = limit
+                this.paginationData.current = 1
+                this.paginationData.limit = limit
+                // 同步到 URL
+                this.updatePagination(1, limit)
                 this.requestList(this.requestParams)
             },
             handleSortChange ({ column, prop, order }) {
@@ -1510,9 +1583,11 @@
                     ascending: 'ASC',
                     descending: 'DESC'
                 }
-                this.pagination.current = 1
+                this.paginationData.current = 1
                 this.requestParams.sortType = prop
                 this.requestParams.collation = orderMap[order]
+                // 同步到 URL
+                this.updateSort(prop, orderMap[order])
                 this.requestList()
             },
 
@@ -1528,9 +1603,19 @@
                     return ''
                 }
             },
-            handleDateRangeChange (value) {
-                const startTime = this.formatTime(value[0])
-                const endTime = this.formatTime(value[1])
+
+            handleClearDateRange () {
+                this.dateTimeRange = []
+                this.requestParams.latestBuildTimeStart = ''
+                this.requestParams.latestBuildTimeEnd = ''
+                this.paginationData.current = 1
+                this.updatePagination(1, this.paginationData.limit)
+                this.updateDateTimeRange('', '')
+                this.requestList()
+            },
+            handleDateRangeChange () {
+                const startTime = this.formatTime(this.dateTimeRange[0])
+                const endTime = this.formatTime(this.dateTimeRange[1])
                 if (startTime && endTime) {
                     this.requestParams.latestBuildTimeStart = startTime
                     this.requestParams.latestBuildTimeEnd = endTime
@@ -1538,7 +1623,9 @@
                     delete this.requestParams.latestBuildTimeStart
                     delete this.requestParams.latestBuildTimeEnd
                 }
-                this.pagination.current = 1
+                this.paginationData.current = 1
+                // 同步到 URL
+                this.updateDateTimeRange(startTime, endTime)
                 this.requestList()
             },
             async handleExportCSV () {
@@ -1602,6 +1689,10 @@
             },
             handleInstallEnd () {
                 this.requestList(this.requestParams)
+            },
+
+            handleImportIMetaNode () {
+                this.$refs.importIMetaNode.open()
             }
         }
     }
@@ -1620,7 +1711,11 @@
         overflow: hidden;
 
         .sub-view-port {
+            height: calc(100% - 100px);
             margin: 24px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         .prompt-operator,

@@ -34,6 +34,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 
 @Schema(title = "流水线-插件信息请求报文体")
 data class AtomCreateRequest(
+    @get:Schema(title = "指定插件ID, 不指定默认使用UUID", required = false)
+    val id: String? = null,
     @get:Schema(title = "插件名称", required = true)
     val name: String,
     @get:Schema(title = "插件代码", required = true)
@@ -61,5 +63,9 @@ data class AtomCreateRequest(
     @get:Schema(title = "自定义扩展容器前端表单属性字段的Json串", required = false)
     val props: String?,
     @get:Schema(title = "预留字段（设置规则等信息的json串）", required = false)
-    val data: String?
+    val data: String?,
+    @get:Schema(title = "归属应用标识", required = false)
+    val ownerStoreCode: String? = null,
+    @get:Schema(title = "LOGO", required = false)
+    val logoUrl: String? = null
 )

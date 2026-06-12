@@ -28,6 +28,7 @@
 package com.tencent.devops.ai.api.user
 
 import com.tencent.devops.ai.pojo.ExternalAgentCreate
+import com.tencent.devops.ai.pojo.ExternalAgentPlatformConfigInfo
 import com.tencent.devops.ai.pojo.ExternalAgentInfo
 import com.tencent.devops.ai.pojo.ExternalAgentUpdate
 import com.tencent.devops.common.api.auth.AUTH_HEADER_USER_ID
@@ -67,6 +68,19 @@ interface UserAiExternalAgentResource {
         @Parameter(description = "创建外部智能体请求体", required = true)
         request: ExternalAgentCreate
     ): Result<ExternalAgentInfo>
+
+    @Operation(summary = "获取外部智能体平台动态配置元数据")
+    @GET
+    @Path("/metadata/platforms")
+    fun listPlatformConfigs(
+        @Parameter(
+            description = "用户ID",
+            required = true,
+            example = AUTH_HEADER_USER_ID_DEFAULT_VALUE
+        )
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String
+    ): Result<List<ExternalAgentPlatformConfigInfo>>
 
     @Operation(summary = "获取我的外部智能体列表")
     @GET

@@ -33,16 +33,9 @@ import io.swagger.v3.oas.annotations.media.Schema
 data class ExternalAgentAuthConfig(
     @get:Schema(title = "认证模式，仅 BKAIDEV 使用", example = "USER")
     val authMode: ExternalAgentAuthMode? = null,
-    @get:Schema(title = "蓝鲸应用 ID，仅 BKAIDEV 应用态使用")
-    val bkAppCode: String? = null,
-    @get:Schema(title = "蓝鲸应用密钥，仅 BKAIDEV 应用态使用")
-    val bkAppSecret: String? = null,
-    @get:Schema(title = "用户 access_token，仅 BKAIDEV 用户态使用")
-    val accessToken: String? = null,
-    @get:Schema(title = "BKAIDEV 用户名，仅 BKAIDEV 应用态使用")
-    val bkAiDevUser: String? = null,
-    @get:Schema(title = "Knot 个人或团队 token")
-    val knotApiToken: String? = null,
-    @get:Schema(title = "Knot 当前真实用户")
-    val knotApiUser: String? = null
+    @get:Schema(
+        title = "动态字段值",
+        description = "前端根据平台元数据返回的字段 key 组装；当前用户字段由后端自动填充，无需传值"
+    )
+    val values: Map<String, String> = emptyMap()
 )
