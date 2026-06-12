@@ -305,7 +305,7 @@ class NodeService @Autowired constructor(
             sortType = sortType,
             collation = collation,
             tagValueIds = tagValues,
-            nodeIds = nodes.filter { it.nodeId.isNotBlank() }.map { it.nodeId.toLong() },
+            nodeIds = nodes.map { it.nodeId.toLong() },
             operatorStatus = operatorStatus
         ).toLong()
         if (-1 != page) {
@@ -491,7 +491,7 @@ class NodeService @Autowired constructor(
         val nodeEnvsGroups = nodeEnvs.groupBy({ it.nodeId }, { envInfos[it.envId]?.envName ?: "" })
         val envNodeRecordList = envNodeDao.list(dslContext, projectId, envInfos.values.map { it.envId })
         val nodeIdMaps = envNodeRecordList.associate { it.nodeId to it.enableNode }
-        val result = nodeListResult.map {
+        return nodeListResult.map {
             val thirdPartyAgent = thirdPartyAgentMap[it.nodeId]
             val gatewayShowName = if (thirdPartyAgent != null) {
                 slaveGatewayService.getShowName(thirdPartyAgent.gateway)
@@ -550,55 +550,7 @@ class NodeService @Autowired constructor(
                 createWorkspaceId = thirdPartyAgent?.createWorkspaceName,
                 operatorStatus = NodeOperatorStatus.valOf(it.operatorStatus)?.name
             )
-        }.toMutableList()
-        if (resourceType != AuthResourceType.CREATIVE_STREAM_NODE) {
-            return result
         }
-        // 创作流节点存在有创作流资源但是未导入的情况，单独展示下.TODO: 先这样子，后面改为用NODE的状态
-        thirdPartyAgentDao.getNotImportCreateAgent(dslContext, projectId).forEach {
-            result.add(
-                NodeWithPermission(
-                    nodeHashId = "",
-                    nodeId = "",
-                    name = it.ip,
-                    ip = it.ip,
-                    nodeStatus = NodeStatus.NOT_INSTALLED.name,
-                    taskId = null,
-                    nodeType = NodeType.CREATE.name,
-                    osName = it.os,
-                    createdUser = it.createdUser,
-                    operator = null,
-                    bakOperator = null,
-                    canUse = false,
-                    canEdit = false,
-                    canDelete = false,
-                    canView = false,
-                    gateway = slaveGatewayService.getShowName(it.gateway),
-                    displayName = it.ip,
-                    createTime = if (null == it.createdTime) {
-                        ""
-                    } else {
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(it.createdTime)
-                    },
-                    lastModifyTime = "",
-                    lastModifyUser = "",
-                    agentStatus = false,
-                    agentVersion = "",
-                    agentHashId = HashUtil.encodeLongId(it.id ?: 0L),
-                    cloudAreaId = null,
-                    osType = it.os,
-                    bkHostId = null,
-                    serverId = null,
-                    size = null,
-                    envNames = null,
-                    lastBuildTime = "",
-                    tags = null,
-                    envEnableNode = false,
-                    createWorkspaceId = it.createWorkspaceName
-                )
-            )
-        }
-        return result
     }
 
     fun getNodeStatus(
