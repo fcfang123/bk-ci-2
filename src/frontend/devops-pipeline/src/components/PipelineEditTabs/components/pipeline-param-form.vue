@@ -162,6 +162,7 @@
                         name="displayCondition"
                         :disabled="disabled"
                         :param="displayConditionList"
+                        :add-btn-text="$t('editPage.addDisplayCondition')"
                         :operator-list="displayConditionOperatorList"
                         v-bind="displayConditionSetting"
                         :handle-change="handleUpdateDisplayCondition"

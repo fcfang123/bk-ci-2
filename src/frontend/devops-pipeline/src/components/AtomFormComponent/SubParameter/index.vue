@@ -1,22 +1,37 @@
 <template>
-    <div class="sub-parameter">
+    <div :class="['sub-parameter', {
+        'sub-parameter-condition': hasOperatorList
+    }]">
         <label class="bk-label">
-            {{ title }}：
+            <span>{{ title }}{{ hasOperatorList ? '' : '：' }}</span>
+            <i
+                v-if="desc && hasOperatorList"
+                class="bk-icon icon-info-circle sub-params-desc-icon"
+                v-bk-tooltips.top="{ content: desc, allowHTML: false }"
+            />
             <span
-                v-if="!disabled"
+                v-if="!disabled && !hasOperatorList"
                 class="add-params-btn"
                 @click="addParam"
             >
                 <i class="devops-icon icon-plus-circle"></i>
-                {{ $t('addParam') }}
+                {{ displayAddBtnText }}
             </span>
         </label>
-        <div class="sub-params-desc">{{ desc }}</div>
+        <div
+            v-if="desc && !hasOperatorList"
+            class="sub-params-desc"
+        >
+            {{ desc }}
+        </div>
         <div
             class="bk-form-content"
-            v-if="parameters.length"
+            v-if="parameters.length || hasOperatorList"
         >
-            <ul v-bkloading="{ isLoading }">
+            <ul
+                v-if="parameters.length"
+                v-bkloading="{ isLoading }"
+            >
                 <li
                     class="param-input"
                     v-for="(parameter, index) in parameters"
@@ -32,6 +47,7 @@
                             class="input-com"
                             :disabled="disabled"
                             :value="parameter.key"
+                            :placeholder="keyPlaceholder"
                             @change="(val) => handleChangeKey(val, index)"
                         >
                             <bk-option
@@ -79,7 +95,7 @@
                         class="input-com"
                         :disabled="disabled || parameter.disabled"
                         :multiple="true"
-                        :placeholder="$t('selectTips')"
+                        :placeholder="valueSelectPlaceholder"
                         @change="(val) => handleChangeValue(val, index)"
                     >
                         <bk-option
@@ -99,6 +115,7 @@
                         }]"
                         :disabled="disabled || parameter.disabled"
                         :title="parameter.value"
+                        :placeholder="valueInputPlaceholder"
                         @change="(val) => handleChangeValue(val, index)"
                     />
                     <i
@@ -108,6 +125,14 @@
                     />
                 </li>
             </ul>
+            <span
+                v-if="!disabled && hasOperatorList"
+                class="add-params-btn condition-add-btn"
+                @click="addParam"
+            >
+                <i class="devops-icon icon-plus-circle"></i>
+                {{ displayAddBtnText }}
+            </span>
         </div>
     </div>
 </template>
@@ -127,6 +152,7 @@
             title: String,
             desc: String,
             param: Object,
+            addBtnText: String,
             operatorList: {
                 type: Array,
                 default: () => []
@@ -179,6 +205,18 @@
             },
             inOperator () {
                 return IN_OPERATOR
+            },
+            displayAddBtnText () {
+                return this.addBtnText || this.$t('addParam')
+            },
+            keyPlaceholder () {
+                return this.hasOperatorList ? this.$t('editPage.selectParamTips') : ''
+            },
+            valueInputPlaceholder () {
+                return this.hasOperatorList ? this.$t('editPage.paramValueTips') : ''
+            },
+            valueSelectPlaceholder () {
+                return this.hasOperatorList ? this.$t('editPage.selectParamValueTips') : this.$t('selectTips')
             },
             requiredParams () {
                 const requiredParamList = this.container?.params?.filter(item => !item.constant && item.required) || []
@@ -439,9 +477,22 @@
         display: inline-flex;
         color: #979BA5;
     }
+    .sub-params-desc-icon {
+        margin-left: 6px;
+        color: #979BA5;
+        font-size: 16px;
+        cursor: pointer;
+    }
     .add-params-btn {
         color: #3A84FF;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+
+        .devops-icon {
+            margin-right: 6px;
+            font-size: 16px;
+        }
     }
     .param-input {
         margin-bottom: 10px;
@@ -463,6 +514,51 @@
             font-size: 14px;
             margin-left: 5px;
             cursor: pointer;
+        }
+    }
+    .sub-parameter-condition {
+        .bk-label {
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 8px;
+            line-height: 20px;
+        }
+
+        .bk-form-content {
+            padding: 16px 32px;
+            background: #F5F7FA;
+        }
+
+        ul {
+            padding: 0;
+            margin: 0;
+        }
+
+        .param-input {
+            margin-bottom: 12px;
+            gap: 0;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+
+            .input-com {
+                flex: 1 1 0;
+                min-width: 0;
+            }
+
+            .input-operator {
+                flex: 0 0 88px;
+                margin: 0;
+            }
+
+            .minus-btn {
+                margin-left: 8px;
+            }
+        }
+
+        .condition-add-btn {
+            margin-top: 12px;
         }
     }
 </style>
