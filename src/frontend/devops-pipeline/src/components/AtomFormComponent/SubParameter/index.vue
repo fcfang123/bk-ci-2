@@ -525,7 +525,7 @@
         }
 
         .bk-form-content {
-            padding: 16px 32px;
+            padding: 12px 32px 14px;
             background: #F5F7FA;
         }
 
@@ -558,7 +558,9 @@
         }
 
         .condition-add-btn {
-            margin-top: 12px;
+            display: flex;
+            width: fit-content;
+            margin-top: 8px;
         }
     }
 </style>
