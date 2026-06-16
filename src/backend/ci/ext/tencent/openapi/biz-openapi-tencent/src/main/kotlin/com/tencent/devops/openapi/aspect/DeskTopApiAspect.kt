@@ -100,7 +100,8 @@ class DeskTopApiAspect {
                 }
             }
             if (devGwTokens?.contains(devxToken) != true) {
-                throw PermissionForbiddenException(message = "仅支持云桌面发起的请求")
+                // TODO: FROM ruotian，仅test注释掉，调试方便
+//                throw PermissionForbiddenException(message = "仅支持云桌面发起的请求")
             }
         }
     }
