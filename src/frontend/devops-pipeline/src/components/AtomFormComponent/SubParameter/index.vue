@@ -525,7 +525,7 @@
         }
 
         .bk-form-content {
-            padding: 12px 32px 14px;
+            padding: 12px 16px;
             background: #F5F7FA;
         }
 
