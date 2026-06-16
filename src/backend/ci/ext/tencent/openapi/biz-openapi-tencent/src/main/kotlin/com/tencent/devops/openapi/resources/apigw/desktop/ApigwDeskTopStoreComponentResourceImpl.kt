@@ -21,6 +21,7 @@ import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
 import com.tencent.devops.store.pojo.common.statistic.StoreDailyStatisticRequest
+import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import org.springframework.beans.factory.annotation.Autowired
 
 @RestResource
@@ -110,6 +111,24 @@ class ApigwDeskTopStoreComponentResourceImpl @Autowired constructor(private val 
             keyword = keyword,
             page = page,
             pageSize = pageSize
+        )
+    }
+
+    override fun getComponentVersionsByCode(
+        userId: String,
+        storeType: String,
+        storeCode: String,
+        page: Int,
+        pageSize: Int,
+        availableFlag: Boolean?
+    ): Result<Page<StoreComponentVersionItem>> {
+        return client.get(ServiceStoreComponentResource::class).getComponentVersionsByCode(
+            userId = userId,
+            storeType = storeType,
+            storeCode = storeCode,
+            page = page,
+            pageSize = pageSize,
+            availableFlag = availableFlag
         )
     }
 

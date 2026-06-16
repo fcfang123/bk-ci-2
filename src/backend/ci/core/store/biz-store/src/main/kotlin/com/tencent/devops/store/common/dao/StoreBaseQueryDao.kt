@@ -141,21 +141,21 @@ class StoreBaseQueryDao {
     ): Result<TStoreBaseRecord> {
         return with(TStoreBase.T_STORE_BASE) {
             dslContext.selectFrom(this)
-                    .where(
-                        mutableListOf(
-                            STORE_TYPE.eq(storeType.type.toByte()),
-                            LATEST_FLAG.eq(true)
-                        ).let {
-                            if (storeStatus != null) {
-                                it.add(STATUS.eq(storeStatus.name))
-                            }
-                            if (!storeCodes.isNullOrEmpty()) {
-                                it.add(STORE_CODE.`in`(storeCodes))
-                            }
-                            it
+                .where(
+                    mutableListOf(
+                        STORE_TYPE.eq(storeType.type.toByte()),
+                        LATEST_FLAG.eq(true)
+                    ).let {
+                        if (storeStatus != null) {
+                            it.add(STATUS.eq(storeStatus.name))
                         }
-                    )
-                    .fetch()
+                        if (!storeCodes.isNullOrEmpty()) {
+                            it.add(STORE_CODE.`in`(storeCodes))
+                        }
+                        it
+                    }
+                )
+                .fetch()
         }
     }
 
@@ -554,10 +554,21 @@ class StoreBaseQueryDao {
         return conditions
     }
 
-    fun countByCode(dslContext: DSLContext, storeCode: String, storeType: StoreTypeEnum): Int {
+    fun countByCode(
+        dslContext: DSLContext,
+        storeCode: String,
+        storeType: StoreTypeEnum,
+        storeStatusList: List<String>? = null
+    ): Int {
         with(TStoreBase.T_STORE_BASE) {
+            val conditions = mutableListOf<Condition>()
+            conditions.add(STORE_CODE.eq(storeCode))
+            conditions.add(STORE_TYPE.eq(storeType.type.toByte()))
+            if (!storeStatusList.isNullOrEmpty()) {
+                conditions.add(STATUS.`in`(storeStatusList))
+            }
             return dslContext.selectCount().from(this)
-                .where(STORE_CODE.eq(storeCode).and(STORE_TYPE.eq(storeType.type.toByte())))
+                .where(conditions)
                 .fetchOne(0, Int::class.java)!!
         }
     }
@@ -571,15 +582,14 @@ class StoreBaseQueryDao {
         pageSize: Int? = null
     ): Result<TStoreBaseRecord> {
         return with(TStoreBase.T_STORE_BASE) {
+            val conditions = mutableListOf<Condition>()
+            conditions.add(STORE_CODE.eq(storeCode))
+            conditions.add(STORE_TYPE.eq(storeType.type.toByte()))
+            if (!storeStatusList.isNullOrEmpty()) {
+                conditions.add(STATUS.`in`(storeStatusList))
+            }
             val baseStep = dslContext.selectFrom(this)
-                .where(STORE_CODE.eq(storeCode))
-                .and(STORE_TYPE.eq(storeType.type.toByte()))
-                .let {
-                    if (!storeStatusList.isNullOrEmpty()) {
-                        it.and(STATUS.`in`(storeStatusList))
-                    }
-                    it
-                }
+                .where(conditions)
                 .orderBy(CREATE_TIME.desc())
             if (null != page && null != pageSize) {
                 baseStep.limit((page - 1) * pageSize, pageSize).fetch()
@@ -639,16 +649,16 @@ class StoreBaseQueryDao {
                 VERSION.`as`(KEY_VERSION),
                 STATUS.`as`(KEY_ATOM_STATUS)
             )
-                    .from(this)
-                    .where(STORE_CODE.eq(storeCode))
-                    .and(STORE_TYPE.eq(storeType.type.toByte()))
-                    .let {
-                        if (status != null) {
-                            it.and(STATUS.eq(status.name))
-                        }
-                        it
+                .from(this)
+                .where(STORE_CODE.eq(storeCode))
+                .and(STORE_TYPE.eq(storeType.type.toByte()))
+                .let {
+                    if (status != null) {
+                        it.and(STATUS.eq(status.name))
                     }
-                    .orderBy(CREATE_TIME.desc())
+                    it
+                }
+                .orderBy(CREATE_TIME.desc())
             if (null != page && null != pageSize) {
                 baseStep.limit((page - 1) * pageSize, pageSize).fetch()
             } else {
@@ -678,19 +688,19 @@ class StoreBaseQueryDao {
                 }
             }
             dslContext.select(groupField, DSL.count())
-                    .from(this)
-                    .where(
-                        listOf(
-                            STORE_TYPE.eq(queryGroupParam.storeType.type.toByte()),
-                            STORE_CODE.`in`(storeCodes),
-                            OWNER_STORE_CODE.isNotNull
-                        )
+                .from(this)
+                .where(
+                    listOf(
+                        STORE_TYPE.eq(queryGroupParam.storeType.type.toByte()),
+                        STORE_CODE.`in`(storeCodes),
+                        OWNER_STORE_CODE.isNotNull
                     )
-                    .groupBy(groupField)
-                    .fetch()
-                    .map {
-                        Pair(it.value1() as String, it.value2())
-                    }
+                )
+                .groupBy(groupField)
+                .fetch()
+                .map {
+                    Pair(it.value1() as String, it.value2())
+                }
         }
     }
 }
