@@ -1,7 +1,7 @@
 <template>
     <bk-dialog
         v-model="isShow"
-        :width="860"
+        :width="1080"
         :title="$t('environment.nodeInfo.importIMetaNode')"
         header-position="left"
         :close-icon="step === 'list'"
@@ -60,14 +60,16 @@
                     :label="$t('environment.nodeInfo.os')"
                     prop="os"
                     width="100"
+                    show-overflow-tooltip
                 />
                 <bk-table-column
                     :label="$t('environment.nodeInfo.engine')"
                     prop="engine"
                     width="100"
+                    show-overflow-tooltip
                 />
                 <bk-table-column
-                    :label="$t('environment.status')"
+                    :label="$t('environment.IMetaStatus')"
                     width="130"
                 >
                     <template slot-scope="props">
@@ -77,6 +79,17 @@
                         </span>
                     </template>
                 </bk-table-column>
+                <bk-table-column
+                    :label="$t('environment.envInfo.creator')"
+                    prop="createUser"
+                    width="100"
+                    show-overflow-tooltip
+                />
+                <bk-table-column
+                    :label="$t('environment.envInfo.creationTime')"
+                    prop="createTime"
+                    show-overflow-tooltip
+                />
             </bk-table>
 
             <!-- 分页 -->
@@ -138,7 +151,6 @@
 </template>
 
 <script>
-    import { mapActions } from 'vuex'
     import StatusIcon from '@/components/status-icon.vue'
 
     export default {
