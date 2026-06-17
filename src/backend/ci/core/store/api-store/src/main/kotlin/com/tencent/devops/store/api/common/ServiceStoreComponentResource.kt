@@ -44,6 +44,7 @@ import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
+import com.tencent.devops.store.pojo.common.media.StoreMediaInfo
 import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import com.tencent.devops.store.pojo.common.version.VersionInfo
 import io.swagger.v3.oas.annotations.Operation
@@ -430,4 +431,21 @@ interface ServiceStoreComponentResource {
         @QueryParam("storeCodes")
         storeCodes: String? = null
     ): Result<List<StoreBaseInfo>>
+
+    @Operation(summary = "获取组件媒体信息")
+    @Path("/types/{storeType}/codes/{storeCode}/component/media/info/get")
+    @GET
+    fun getStoreMediaInfo(
+        @Parameter(description = "userId", required = true)
+        @HeaderParam(AUTH_HEADER_USER_ID)
+        userId: String,
+        @Parameter(description = "组件类型", required = true)
+        @PathParam("storeType")
+        @BkField(patternStyle = BkStyleEnum.CODE_STYLE)
+        storeType: StoreTypeEnum,
+        @Parameter(description = "组件代码", required = true)
+        @PathParam("storeCode")
+        @BkField(patternStyle = BkStyleEnum.CODE_STYLE)
+        storeCode: String
+    ): Result<List<StoreMediaInfo>?>
 }

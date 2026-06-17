@@ -20,6 +20,7 @@ import com.tencent.devops.store.pojo.common.deploy.UserComponentDeployInfo
 import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
+import com.tencent.devops.store.pojo.common.media.StoreMediaInfo
 import com.tencent.devops.store.pojo.common.statistic.StoreDailyStatisticRequest
 import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import org.springframework.beans.factory.annotation.Autowired
@@ -207,5 +208,13 @@ class ApigwDeskTopStoreComponentResourceImpl @Autowired constructor(private val 
             storeCode = storeCode,
             storeDailyStatisticRequest = storeDailyStatisticRequest
         )
+    }
+
+    override fun getStoreMediaInfo(
+        userId: String,
+        storeType: StoreTypeEnum,
+        storeCode: String
+    ): Result<List<StoreMediaInfo>?> {
+        return client.get(ServiceStoreComponentResource::class).getStoreMediaInfo(userId, storeType, storeCode)
     }
 }
