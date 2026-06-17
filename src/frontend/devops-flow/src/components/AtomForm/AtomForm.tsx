@@ -381,6 +381,7 @@ export default defineComponent({
                     placeholder={getPlaceholder(child)}
                     handleChange={handleChange}
                     atomValue={props.atomValue}
+                    errorFields={props.errorFields}
                     {...childRest}
                   />
                   {showDefaultError && <p class={styles.fieldErrorMessage}>{t('flow.orchestration.fieldRequired')}</p>}
@@ -415,6 +416,7 @@ export default defineComponent({
             placeholder={getPlaceholder(obj)}
             handleChange={handleChange}
             atomValue={props.atomValue}
+            errorFields={props.errorFields}
             {...rest}
           />
           {showDefaultError && <p class={styles.fieldErrorMessage}>{t('flow.orchestration.fieldRequired')}</p>}
@@ -430,6 +432,7 @@ export default defineComponent({
       const Component = COMPONENT_MAP[componentType] || VuexInput
       const value = props.atomValue[key] ?? obj.default ?? ''
       const hasError = props.errorFields.includes(key)
+      const showDefaultError = hasError && !SELF_ERROR_COMPONENTS.has(componentType)
       // remove '@type' from obj
       const { '@type': _type, ...rest } = obj
 
@@ -449,8 +452,10 @@ export default defineComponent({
               placeholder={getPlaceholder(obj)}
               handleChange={handleChange}
               atomValue={props.atomValue}
+              errorFields={props.errorFields}
               {...rest}
             />
+            {showDefaultError && <p class={styles.fieldErrorMessage}>{t('flow.orchestration.fieldRequired')}</p>}
           </div>
         </div>
       )
