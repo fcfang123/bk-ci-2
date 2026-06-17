@@ -270,6 +270,7 @@ class TapdWebhookRequestService(
         )
     }
 
+    @SuppressWarnings("NestedBlockDepth")
     private fun getTapdObjectBaseInfo(
         eventType: TapdEventType,
         eventAction: TapdEventAction,
@@ -288,7 +289,8 @@ class TapdWebhookRequestService(
                                 "getBugFieldsInfo|${it.priorityLabel}|" +
                                         "${JsonUtil.toJson(fieldsInfo, false)}"
                             )
-                            map[TAPD_KEY_PRIORITY_LABEL] = fieldsInfo.priorityLabel
+                            map[TAPD_KEY_PRIORITY_LABEL] = fieldsInfo
+                                    ?.priorityLabel
                                     ?.options
                                     ?.get(it.priorityLabel) ?: ""
                         }
