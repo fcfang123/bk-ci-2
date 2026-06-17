@@ -263,7 +263,8 @@
                         params: {
                             ...this.$route.params,
                             version
-                        }
+                        },
+                        query: this.$route.query
                     })
                     this.$bkMessage({
                         theme: 'success',
