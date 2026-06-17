@@ -2012,6 +2012,8 @@
                                 "type" : "number"
                               }, {
                                 "type" : "boolean"
+                              }, {
+                                "type" : "array"
                               } ]
                             },
                             "readonly" : {
@@ -2298,6 +2300,8 @@
                               "type" : "number"
                             }, {
                               "type" : "boolean"
+                            }, {
+                              "type" : "array"
                             } ]
                           },
                           "readonly" : {
