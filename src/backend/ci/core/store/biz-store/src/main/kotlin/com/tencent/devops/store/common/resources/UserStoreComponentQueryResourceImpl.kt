@@ -31,6 +31,7 @@ import com.tencent.devops.common.api.pojo.Page
 import com.tencent.devops.common.api.pojo.Result
 import com.tencent.devops.common.web.RestResource
 import com.tencent.devops.store.api.common.UserStoreComponentQueryResource
+import com.tencent.devops.store.common.service.StoreComponentDeployService
 import com.tencent.devops.store.common.service.StoreComponentQueryService
 import com.tencent.devops.store.common.service.StoreMediaService
 import com.tencent.devops.store.common.service.StoreProjectService
@@ -39,12 +40,14 @@ import com.tencent.devops.store.pojo.common.MarketMainItem
 import com.tencent.devops.store.pojo.common.MyStoreComponent
 import com.tencent.devops.store.pojo.common.StoreDetailInfo
 import com.tencent.devops.store.pojo.common.StoreInfoQuery
+import com.tencent.devops.store.pojo.common.deploy.UserComponentDeployInfo
 import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
+import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
 import com.tencent.devops.store.pojo.common.media.StoreMediaInfo
 import com.tencent.devops.store.pojo.common.test.StoreTestItem
-import com.tencent.devops.store.pojo.common.version.StoreDeskVersionItem
+import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import com.tencent.devops.store.pojo.common.version.StoreShowVersionInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionLogInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionSizeInfo
@@ -54,6 +57,7 @@ import org.springframework.beans.factory.annotation.Autowired
 @RestResource
 class UserStoreComponentQueryResourceImpl @Autowired constructor(
     private val storeComponentQueryService: StoreComponentQueryService,
+    private val storeComponentDeployService: StoreComponentDeployService,
     private val storeProjectService: StoreProjectService,
     private val storeMediaService: StoreMediaService
 ) : UserStoreComponentQueryResource {
@@ -81,15 +85,22 @@ class UserStoreComponentQueryResourceImpl @Autowired constructor(
         storeType: String,
         storeCode: String,
         page: Int,
-        pageSize: Int
-    ): Result<Page<StoreDeskVersionItem>> {
+        pageSize: Int,
+        availableFlag: Boolean?
+    ): Result<Page<StoreComponentVersionItem>> {
+        // availableFlag=true  → 仅 RELEASED，不校验成员权限（首页等公开场景）
+        // availableFlag=null/false → 全部版本，校验成员权限（工作台，兼容老逻辑）
+        val checkPermission = availableFlag != true
+        val statusList = if (availableFlag == true) listOf(StoreStatusEnum.RELEASED.name) else null
         return Result(
             storeComponentQueryService.getComponentVersionsByCode(
                 userId = userId,
                 storeCode = storeCode,
                 storeType = storeType,
                 page = page,
-                pageSize = pageSize
+                pageSize = pageSize,
+                checkPermissionFlag = checkPermission,
+                storeStatusList = statusList
             )
         )
     }
@@ -187,6 +198,35 @@ class UserStoreComponentQueryResourceImpl @Autowired constructor(
                     updateFlag = updateFlag
                 ),
                 urlProtocolTrim = true
+            )
+        )
+    }
+
+    override fun getUserComponentDeployInfos(
+        userId: String,
+        storeType: String,
+        projectCode: String?,
+        instanceId: String?,
+        keyword: String?,
+        sortType: StoreSortTypeEnum?,
+        page: Int,
+        pageSize: Int
+    ): Result<Page<UserComponentDeployInfo>> {
+        return Result(
+            storeComponentDeployService.getUserComponentDeployInfos(
+                userId = userId,
+                storeInfoQuery = StoreInfoQuery(
+                    storeType = storeType,
+                    projectCode = projectCode,
+                    instanceId = instanceId,
+                    keyword = keyword,
+                    sortType = sortType ?: StoreSortTypeEnum.CREATE_TIME,
+                    // 应用列表按可见范围(用户组织架构+组件可见范围)查询，不受项目/实例已安装情况影响；
+                    // queryProjectComponentFlag=true会走"项目/实例已安装组件"过滤逻辑，与本接口语义不符，故置为false。
+                    queryProjectComponentFlag = false,
+                    page = page,
+                    pageSize = pageSize
+                )
             )
         )
     }

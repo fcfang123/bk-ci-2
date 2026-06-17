@@ -8,7 +8,9 @@ data class ImateListItem(
     val ip: String?,
     val os: OS,
     val engine: ImateItemEngine,
-    val status: String?
+    val status: String?,
+    val createTime: String?,
+    val createUser: String?
 )
 
 enum class ImateItemEngine {
@@ -51,5 +53,6 @@ data class ImportImageNodeData(
 )
 
 data class ImportImageNodeDataItem(
+    val name: String,
     val deviceId: String
 )

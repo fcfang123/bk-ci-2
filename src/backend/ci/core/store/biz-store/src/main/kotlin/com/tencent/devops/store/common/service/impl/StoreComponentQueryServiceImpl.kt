@@ -38,7 +38,6 @@ import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.pojo.Page
 import com.tencent.devops.common.api.pojo.Result
 import com.tencent.devops.common.api.util.DateTimeUtil
-import com.tencent.devops.common.api.util.JsonSchemaUtil
 import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.api.util.ThreadLocalUtil
 import com.tencent.devops.common.api.util.Watcher
@@ -78,6 +77,7 @@ import com.tencent.devops.store.common.service.StoreMemberService
 import com.tencent.devops.store.common.service.StoreProjectService
 import com.tencent.devops.store.common.service.StoreTotalStatisticService
 import com.tencent.devops.store.common.service.StoreUserService
+import com.tencent.devops.store.common.utils.StoreExtFieldUtil
 import com.tencent.devops.store.common.service.action.StoreDecorateFactory
 import com.tencent.devops.store.common.utils.StoreUtils
 import com.tencent.devops.store.constant.StoreMessageCode
@@ -102,22 +102,21 @@ import com.tencent.devops.store.pojo.common.enums.StoreProjectTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
-import com.tencent.devops.store.pojo.common.version.StoreDeskVersionItem
+import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import com.tencent.devops.store.pojo.common.version.StoreShowVersionInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionLogInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionSizeInfo
 import com.tencent.devops.store.pojo.common.version.VersionInfo
 import com.tencent.devops.store.pojo.common.version.VersionModel
+import org.jooq.DSLContext
+import org.jooq.Record
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
-import org.jooq.DSLContext
-import org.jooq.Record
-import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.stereotype.Service
 
 @Suppress("TooManyFunctions", "LargeClass")
 @Service
@@ -203,7 +202,6 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
 
     companion object {
         private val executor = Executors.newFixedThreadPool(30)
-        private val logger = LoggerFactory.getLogger(StoreComponentQueryServiceImpl::class.java)
     }
 
     private val storeBusNumCache = Caffeine.newBuilder()
@@ -450,8 +448,9 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
         storeCode: String,
         page: Int,
         pageSize: Int,
-        checkPermissionFlag: Boolean
-    ): Page<StoreDeskVersionItem> {
+        checkPermissionFlag: Boolean,
+        storeStatusList: List<String>?
+    ): Page<StoreComponentVersionItem> {
         val storeTypeEnum = StoreTypeEnum.valueOf(storeType)
         // 判断当前用户是否是组件的成员
         if (checkPermissionFlag && !storeMemberDao.isStoreMember(
@@ -466,28 +465,35 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
         val count = storeBaseQueryDao.countByCode(
             dslContext = dslContext,
             storeCode = storeCode,
-            storeType = storeTypeEnum
+            storeType = storeTypeEnum,
+            storeStatusList = storeStatusList
         )
+        if (count == 0) {
+            return Page(page = page, pageSize = pageSize, count = 0, records = emptyList())
+        }
         val records = storeBaseQueryDao.getComponentsByCode(
             dslContext = dslContext,
             storeCode = storeCode,
             storeType = storeTypeEnum,
             page = page,
-            pageSize = pageSize
+            pageSize = pageSize,
+            storeStatusList = storeStatusList
         )
+        if (records.isEmpty()) {
+            return Page(page = page, pageSize = pageSize, count = count.toLong(), records = emptyList())
+        }
         val storeIds = records.map { it.id }
         val versionMap = storeVersionLogDao.getStoreVersions(
             dslContext = dslContext,
             storeIds = storeIds,
             getTestVersionFlag = true
         )?.associateBy({ it.storeId }, { it.content }) ?: emptyMap()
-        //
         val baseExtRecords = storeBaseExtQueryDao.getBaseExtByIds(dslContext, storeIds)
         val baseExtMap = baseExtRecords.groupBy({ it.storeId }, {
-            it.fieldName to formatJson(it.fieldValue)
+            it.fieldName to StoreExtFieldUtil.formatJson(it.fieldValue)
         }).mapValues { it.value.toMap() }
         val storeVersionInfos = records.map {
-            StoreDeskVersionItem(
+            StoreComponentVersionItem(
                 storeId = it.id,
                 storeCode = it.storeCode,
                 storeType = StoreTypeEnum.getStoreType(it.storeType.toInt()),
@@ -530,9 +536,26 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
         )
         val labels = storeLabelService.getLabelsByStoreId(storeBaseRecord.id)
         val userCommentInfo = storeCommentService.getStoreUserCommentInfo(userId, storeCode, storeType)
-
-        val extData = getComponentExtData(storeId, storeCode, storeType)
-        val htmlTemplateVersion = extData[KEY_HTML_TEMPLATE_VERSION]
+        val baseExtRecords = storeBaseExtQueryDao.getBaseExtByIds(dslContext, listOf(storeId))
+        val baseFeatureExtRecords = storeBaseFeatureExtQueryDao.queryStoreBaseFeatureExt(
+            dslContext = dslContext,
+            storeCode = storeCode,
+            storeType = storeType
+        )
+        // 版本级扩展：跟随版本(如 installType、installParams、urlScheme 等)
+        val versionExtData = baseExtRecords.associateBy(
+            { it.fieldName }, { StoreExtFieldUtil.formatJson(it.fieldValue) }
+        ).takeIf { it.isNotEmpty() }
+        // 组件级共享扩展：所有版本共享(如 installPath、os、yamlFlag 等)
+        val featureExtData = baseFeatureExtRecords.associateBy(
+            { it.fieldName }, { StoreExtFieldUtil.formatJson(it.fieldValue) }
+        ).takeIf { it.isNotEmpty() }
+        // 向后兼容：保持 extData 为组件级+版本级合并，旧客户端仍可读取
+        val mergedExt = mutableMapOf<String, Any>()
+        featureExtData?.let { mergedExt.putAll(it) }
+        versionExtData?.let { mergedExt.putAll(it) }
+        val extData = mergedExt.ifEmpty { null }
+        val htmlTemplateVersion = extData?.get(KEY_HTML_TEMPLATE_VERSION)
         val initProjectCode =
             if (htmlTemplateVersion != null && htmlTemplateVersion == FrontendTypeEnum.HISTORY.typeVersion) {
                 ""
@@ -604,13 +627,16 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
         storeType: StoreTypeEnum
     ): Map<String, Any> {
         val baseExtRecords = storeBaseExtQueryDao.getBaseExtByIds(dslContext, listOf(storeId))
-        var extData = baseExtRecords.associateBy({ it.fieldName }, { formatJson(it.fieldValue) })
+        var extData = baseExtRecords.associateBy({ it.fieldName }, { StoreExtFieldUtil.formatJson(it.fieldValue) })
         val baseFeatureExtRecords = storeBaseFeatureExtQueryDao.queryStoreBaseFeatureExt(
             dslContext = dslContext,
             storeCode = storeCode,
             storeType = storeType
         )
-        extData = extData.plus(baseFeatureExtRecords.associateBy({ it.fieldName }, { formatJson(it.fieldValue) }))
+        extData = extData.plus(
+            baseFeatureExtRecords.associateBy({ it.fieldName },
+                { StoreExtFieldUtil.formatJson(it.fieldValue) })
+        )
         return extData
     }
 
@@ -747,6 +773,25 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
             storeInfoQuery = storeInfoQuery,
             urlProtocolTrim = urlProtocolTrim
         ).get()
+    }
+
+    override fun enrichMarketItems(
+        userId: String,
+        userDeptList: List<Int>,
+        storeInfoQuery: StoreInfoQuery,
+        storeInfos: List<Record>,
+        urlProtocolTrim: Boolean
+    ): List<MarketItem> {
+        if (storeInfos.isEmpty()) {
+            return emptyList()
+        }
+        return handleMarketItem(
+            userId = userId,
+            userDeptList = userDeptList,
+            storeInfoQuery = storeInfoQuery,
+            urlProtocolTrim = urlProtocolTrim,
+            storeInfos = storeInfos
+        )
     }
 
     override fun getComponentShowVersionInfo(
@@ -1358,6 +1403,23 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
             storeType = StoreTypeEnum.DEVX,
             storeCodes = ownerStoreCodes
         ).associate { it.storeCode to it.storeName }
+        // 批量查询扩展信息，避免循环内逐组件单查的N+1：
+        // 组件级共享扩展(T_STORE_BASE_FEATURE_EXT)按storeCode聚合；版本级扩展(T_STORE_BASE_EXT)按storeId聚合
+        watcher.start("batchQueryExtInfo")
+        val featureExtRecordsByCode = if (storeCodeList.isEmpty()) {
+            emptyMap()
+        } else {
+            storeBaseFeatureExtQueryDao.batchQueryStoreBaseFeatureExt(
+                dslContext = dslContext,
+                storeCodes = storeCodeList,
+                storeType = storeTypeEnum
+            ).groupBy { it.storeCode }
+        }
+        val versionExtRecordsById = if (storeIds.isEmpty()) {
+            emptyMap()
+        } else {
+            storeBaseExtQueryDao.getBaseExtByIds(dslContext, storeIds).groupBy { it.storeId }
+        }
         watcher.start("handleStoreInfos")
         storeInfos.forEach { record ->
             val storeId = record[tStoreBase.ID]
@@ -1381,14 +1443,29 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
                     currentBusNum > installedBusNum
                 }
             }
-            val osList = queryComponentOsName(storeCode, storeTypeEnum)
+            // 组件级共享扩展(installPath/os/yamlFlag等)与版本级扩展，均取自循环外的批量结果
+            val featureExtRecords = featureExtRecordsByCode[storeCode].orEmpty()
+            val versionExtRecords = versionExtRecordsById[storeId].orEmpty()
+            val osList = featureExtRecords.firstOrNull { it.fieldName == KEY_OS }?.fieldValue
+                ?.let { JsonUtil.to(it, object : TypeReference<List<String>>() {}) }
             // 无构建环境组件是否可以在有构建环境运行
-            val buildLessRunFlag = storeBaseExtQueryDao.getBaseExtByStoreId(
-                dslContext = dslContext,
-                storeId = storeId,
-                fieldName = KEY_BUILD_LESS_RUN_FLAG
-            ).firstOrNull()?.fieldValue?.toBoolean()
-            val extData = getBaseExtData(storeId, storeCode, storeTypeEnum)
+            val buildLessRunFlag = versionExtRecords
+                .firstOrNull { it.fieldName == KEY_BUILD_LESS_RUN_FLAG }?.fieldValue?.toBoolean()
+            // 组件级共享扩展：所有版本共享(如 installPath、os、yamlFlag 等)
+            val featureExtData = if (featureExtRecords.isNotEmpty()) {
+                featureExtRecords.associate { it.fieldName to StoreExtFieldUtil.formatJson(it.fieldValue) }
+            } else {
+                null
+            }
+            // 版本级扩展：列表保持精简，仅取 urlScheme；
+            // installType/installParams 等安装明细由详情接口(StoreDetailInfo)/部署接口按需提供
+            val urlScheme = versionExtRecords.firstOrNull { it.fieldName == KEY_URL_SCHEME }?.fieldValue
+            val versionExtData = if (!urlScheme.isNullOrBlank()) mapOf(KEY_URL_SCHEME to urlScheme) else null
+            // 向后兼容：保持 extData 为组件级+版本级合并，旧客户端仍可读取
+            val mergedExt = mutableMapOf<String, Any>()
+            featureExtData?.let { mergedExt.putAll(it) }
+            versionExtData?.let { mergedExt.putAll(it) }
+            val extData: Map<String, Any>? = if (mergedExt.isNotEmpty()) mergedExt else null
             val publicFlag = record[tStoreBaseFeature.PUBLIC_FLAG] ?: false
             val marketItem = MarketItem(
                 id = storeId,
@@ -1420,7 +1497,7 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
                 modifier = record[tStoreBase.MODIFIER],
                 updateTime = DateTimeUtil.toDateTime(record[tStoreBase.UPDATE_TIME] as LocalDateTime),
                 recommendFlag = record[tStoreBaseFeature.RECOMMEND_FLAG],
-                yamlFlag = extData?.get(KEY_YAML_FLAG) as? Boolean,
+                yamlFlag = featureExtData?.get(KEY_YAML_FLAG) as? Boolean,
                 installed = installed,
                 updateFlag = updateFlag,
                 honorInfos = storeHonorInfoMap[storeCode],
@@ -1440,16 +1517,6 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
         return results
     }
 
-    private fun queryComponentOsName(storeCode: String, storeType: StoreTypeEnum): List<String>? {
-        val os = storeBaseFeatureExtQueryDao.getStoreBaseFeatureExt(
-            dslContext = dslContext,
-            storeCode = storeCode,
-            storeType = storeType,
-            fieldName = KEY_OS
-        )?.fieldValue
-        return os?.let { JsonUtil.to(it, object : TypeReference<List<String>>() {}) }
-    }
-
     private fun convertLogoUrl(url: String, urlProtocolTrim: Boolean): String? {
         var logoUrl = StoreDecorateFactory.get(StoreDecorateFactory.Kind.HOST)?.decorate(url) as? String
         logoUrl = if (logoUrl?.contains("?") == true) {
@@ -1461,41 +1528,6 @@ class StoreComponentQueryServiceImpl : StoreComponentQueryService {
             logoUrl = RegexUtils.trimProtocol(logoUrl)
         }
         return logoUrl
-    }
-
-    private fun getBaseExtData(storeId: String, storeCode: String, storeType: StoreTypeEnum): MutableMap<String, Any>? {
-        val extDataResult = storeBaseFeatureExtQueryDao.queryStoreBaseFeatureExt(
-            dslContext = dslContext,
-            storeCode = storeCode,
-            storeType = StoreTypeEnum.getStoreTypeObj(storeType.type)
-        )
-        val urlScheme = storeBaseExtQueryDao.getBaseExtByStoreId(
-            dslContext = dslContext,
-            storeId = storeId,
-            fieldName = KEY_URL_SCHEME
-        ).firstOrNull()?.fieldValue
-        val extData = if (extDataResult.isNotEmpty || !urlScheme.isNullOrBlank()) {
-            mutableMapOf<String, Any>().apply {
-                urlScheme?.let { put(KEY_URL_SCHEME, it) }
-                extDataResult.forEach { record ->
-                    put(record.fieldName, formatJson(record.fieldValue))
-                }
-            }
-        } else null
-        return extData
-    }
-
-    // 解析字段值为json格式字符串的数据
-    private fun formatJson(str: String): Any {
-        return when {
-            JsonSchemaUtil.isJsonArray(str) -> {
-                JsonUtil.to(str, List::class.java)
-            }
-            JsonSchemaUtil.isJsonObject(str) -> {
-                JsonUtil.to(str, object : TypeReference<Map<String, Any>>() {})
-            }
-            else -> str
-        }
     }
 
     /**

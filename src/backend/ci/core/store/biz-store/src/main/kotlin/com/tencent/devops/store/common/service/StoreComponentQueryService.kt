@@ -39,11 +39,12 @@ import com.tencent.devops.store.pojo.common.StoreDetailInfo
 import com.tencent.devops.store.pojo.common.StoreInfoQuery
 import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
-import com.tencent.devops.store.pojo.common.version.StoreDeskVersionItem
+import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import com.tencent.devops.store.pojo.common.version.StoreShowVersionInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionLogInfo
 import com.tencent.devops.store.pojo.common.version.StoreVersionSizeInfo
 import com.tencent.devops.store.pojo.common.version.VersionInfo
+import org.jooq.Record
 
 interface StoreComponentQueryService {
 
@@ -76,8 +77,9 @@ interface StoreComponentQueryService {
         storeCode: String,
         page: Int,
         pageSize: Int,
-        checkPermissionFlag: Boolean = true
-    ): Page<StoreDeskVersionItem>
+        checkPermissionFlag: Boolean = true,
+        storeStatusList: List<String>? = null
+    ): Page<StoreComponentVersionItem>
 
     /**
      * 根据组件ID获取组件详情
@@ -116,6 +118,18 @@ interface StoreComponentQueryService {
         storeInfoQuery: StoreInfoQuery,
         urlProtocolTrim: Boolean = false
     ): Page<MarketItem>
+
+    /**
+     * 将给定的组件记录富化为市场组件项(MarketItem)。
+     * 供需要复用市场富化逻辑(安装标识、Logo、统计、国际化等)、但自行控制取数与分页的场景使用(如部署信息聚合)。
+     */
+    fun enrichMarketItems(
+        userId: String,
+        userDeptList: List<Int>,
+        storeInfoQuery: StoreInfoQuery,
+        storeInfos: List<Record>,
+        urlProtocolTrim: Boolean = false
+    ): List<MarketItem>
 
     /**
      * 根据组件标识获取组件回显版本信息

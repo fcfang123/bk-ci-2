@@ -155,6 +155,7 @@
                             @click.stop=""
                         >
                             <param-set
+                                v-if="isParamsReady"
                                 ref="paramSetSelector"
                                 :all-params="pipelineParams"
                                 :use-last-params="useLastParams"
@@ -541,6 +542,9 @@
                     return `${yamlInfo.webUrl}/blob/${encodeURIComponent(branch)}/${filePath}`
                 }
                 return yamlInfo.webUrl
+            },
+            isParamsReady () {
+                return !!this.startupInfo && !this.isLoading
             }
         },
         watch: {
@@ -1055,7 +1059,7 @@
                 const allParamMap = this.startupInfo?.properties?.reduce((acc, param) => {
                     acc.set(param.id, param)
                     return acc
-                }, new Map())
+                }, new Map()) ?? new Map()
                 Object.keys(partical).forEach(key => {
                     const param = allParamMap.get(key)
                     if (Object.prototype.hasOwnProperty.call(origin, key)) {

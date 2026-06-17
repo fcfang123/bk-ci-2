@@ -33,6 +33,7 @@ import com.tencent.devops.common.pipeline.enums.ChannelCode
 import com.tencent.devops.common.web.RestResource
 import com.tencent.devops.store.api.common.ServiceStoreComponentResource
 import com.tencent.devops.store.common.service.StoreComponentManageService
+import com.tencent.devops.store.common.service.StoreComponentDeployService
 import com.tencent.devops.store.common.service.StoreComponentQueryService
 import com.tencent.devops.store.pojo.common.InstallStoreReq
 import com.tencent.devops.store.pojo.common.MarketItem
@@ -42,16 +43,19 @@ import com.tencent.devops.store.pojo.common.StoreDetailInfo
 import com.tencent.devops.store.pojo.common.StoreInfoQuery
 import com.tencent.devops.store.pojo.common.StorePackageInfoReq
 import com.tencent.devops.store.pojo.common.UnInstallReq
+import com.tencent.devops.store.pojo.common.deploy.UserComponentDeployInfo
 import com.tencent.devops.store.pojo.common.enums.RdTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreSortTypeEnum
 import com.tencent.devops.store.pojo.common.enums.StoreStatusEnum
 import com.tencent.devops.store.pojo.common.enums.StoreTypeEnum
+import com.tencent.devops.store.pojo.common.version.StoreComponentVersionItem
 import com.tencent.devops.store.pojo.common.version.VersionInfo
 import org.springframework.beans.factory.annotation.Autowired
 
 @RestResource
 class ServiceStoreComponentResourceImpl @Autowired constructor(
     private val storeComponentQueryService: StoreComponentQueryService,
+    private val storeComponentDeployService: StoreComponentDeployService,
     private val storeComponentManageService: StoreComponentManageService
 ) : ServiceStoreComponentResource {
 
@@ -97,6 +101,54 @@ class ServiceStoreComponentResourceImpl @Autowired constructor(
                 instanceId = instanceId,
                 osName = osName,
                 osArch = osArch
+            )
+        )
+    }
+
+    override fun getUserComponentDeployInfos(
+        userId: String,
+        storeType: String,
+        projectCode: String?,
+        instanceId: String?,
+        keyword: String?,
+        page: Int,
+        pageSize: Int
+    ): Result<Page<UserComponentDeployInfo>> {
+        return Result(
+            storeComponentDeployService.getUserComponentDeployInfos(
+                userId = userId,
+                storeInfoQuery = StoreInfoQuery(
+                    storeType = storeType,
+                    projectCode = projectCode,
+                    instanceId = instanceId,
+                    keyword = keyword,
+                    queryProjectComponentFlag = !projectCode.isNullOrBlank(),
+                    page = page,
+                    pageSize = pageSize
+                )
+            )
+        )
+    }
+
+    override fun getComponentVersionsByCode(
+        userId: String,
+        storeType: String,
+        storeCode: String,
+        page: Int,
+        pageSize: Int,
+        availableFlag: Boolean?
+    ): Result<Page<StoreComponentVersionItem>> {
+        val checkPermission = availableFlag != true
+        val statusList = if (availableFlag == true) listOf(StoreStatusEnum.RELEASED.name) else null
+        return Result(
+            storeComponentQueryService.getComponentVersionsByCode(
+                userId = userId,
+                storeCode = storeCode,
+                storeType = storeType,
+                page = page,
+                pageSize = pageSize,
+                checkPermissionFlag = checkPermission,
+                storeStatusList = statusList
             )
         )
     }

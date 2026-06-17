@@ -9,6 +9,7 @@ import com.tencent.devops.common.api.util.timestampmilli
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.environment.constant.EnvironmentMessageCode
 import com.tencent.devops.environment.dao.AgentDao
+import com.tencent.devops.environment.dao.NodeDao
 import com.tencent.devops.environment.model.AgentProps
 import com.tencent.devops.environment.model.AgentPropsSource
 import com.tencent.devops.environment.service.thirdpartyagent.DownloadAgentInstallService
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Service
+import java.lang.Thread.sleep
 import java.time.LocalDateTime
 import java.util.Base64
 
@@ -31,7 +33,9 @@ class TXCreateEnvService @Autowired constructor(
     private val dslContext: DSLContext,
     private val client: Client,
     private val agentDao: AgentDao,
-    private val downloadAgentInstallService: DownloadAgentInstallService
+    private val nodeDao: NodeDao,
+    private val downloadAgentInstallService: DownloadAgentInstallService,
+    private val nodeService: NodeService
 ) : CreateEnvService() {
 
     @Value("\${environment.batch-install.aes-key}")
@@ -67,8 +71,8 @@ class TXCreateEnvService @Autowired constructor(
                 ?.firstOrNull { it.clientUuid == workspaceId }?.botName
         }
         if (source == AgentPropsSource.REMOTEDEV || (source == null && record.os == OS.WINDOWS.name)) {
-            return client.get(ServiceRemoteDevResource::class).getProjectWorkspace(
-                userId, projectId, workspaceId
+            return client.get(ServiceRemoteDevResource::class).startCloudWorkspaceDetail(
+                userId, workspaceId, null
             ).data?.displayName
         }
         return null
@@ -125,6 +129,29 @@ class TXCreateEnvService @Autowired constructor(
         }
 
         return Pair(decodeSub[0], null)
+    }
+
+    fun refreshCreateDisplayName() {
+        agentDao.getAllCreateAgent(dslContext).forEach { agent ->
+            sleep(100)
+            try {
+                val node = nodeDao.get(dslContext, agent.projectId, agent.nodeId) ?: return@forEach
+                val displayName =
+                    getWorkspaceDisplayName(agent.createdUser, agent.projectId, agent.createWorkspaceName)
+                        ?: return@forEach
+                if (node.displayName != displayName) {
+                    logger.info("refreshCreateDisplayName ${node.projectId}|${node.nodeId}|$displayName")
+                    nodeService.updateDisplayName(
+                        agent.createdUser,
+                        agent.projectId,
+                        HashUtil.encodeLongId(agent.nodeId),
+                        displayName
+                    )
+                }
+            }catch (e:Exception){
+                logger.error("refreshCreateDisplayName error", e)
+            }
+        }
     }
 
     companion object {
