@@ -233,7 +233,7 @@ class ElementTransfer @Autowired(required = false) constructor(
 
     private fun tapd2YamlRule(element: TapdWebHookTriggerElement): TapdRule {
         val input = element.data.input
-        val includeActions = if(input.eventType == TapdEventType.STORY) {
+        val includeActions = if (input.eventType == TapdEventType.STORY) {
             input.includeStoryAction
         } else {
             input.includeBugAction
@@ -246,7 +246,12 @@ class ElementTransfer @Autowired(required = false) constructor(
             eventType = input.eventType?.value,
             includeActions = includeActions,
             includeUsers = input.includeUsers,
-            excludeUsers = input.excludeUsers
+            excludeUsers = input.excludeUsers,
+            includeOwners = input.includeOwner,
+            excludeOwners = input.excludeOwner,
+            labels = input.includeLabels?.split(","),
+            labelsIgnore = input.excludeLabels?.split(","),
+            priorities = input.includePriority?.split(",")
         )
     }
 
