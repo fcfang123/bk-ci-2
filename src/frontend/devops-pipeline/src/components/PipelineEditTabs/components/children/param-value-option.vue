@@ -763,10 +763,6 @@
                     })
                     return false
                 }
-                const formListInput = this.$refs.formListInput
-                if (formListInput && typeof formListInput.validate === 'function') {
-                    return formListInput.validate()
-                }
                 return true
             }
         }
