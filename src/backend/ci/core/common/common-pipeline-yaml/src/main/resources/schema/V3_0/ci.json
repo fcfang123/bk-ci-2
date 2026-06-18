@@ -1999,7 +1999,7 @@
                   "fields" : {
                     "type" : "object",
                     "patternProperties" : {
-                      "^(?!template$)(?!^[A-Z][A-Z0-9_]*$).+$" : {
+                      "additionalProperties" : {
                         "anyOf" : [ {
                           "type" : "object",
                           "additionalProperties" : false,
@@ -2012,6 +2012,8 @@
                                 "type" : "number"
                               }, {
                                 "type" : "boolean"
+                              }, {
+                                "type" : "array"
                               } ]
                             },
                             "readonly" : {
@@ -2098,8 +2100,7 @@
                           }
                         } ]
                       }
-                    },
-                    "additionalProperties" : false
+                    }
                   }
                 },
                 "allOf" : [ {
@@ -2285,7 +2286,7 @@
                 "fields" : {
                   "type" : "object",
                   "patternProperties" : {
-                    "^(?!template$)(?!^[A-Z][A-Z0-9_]*$).+$" : {
+                    "additionalProperties" : {
                       "anyOf" : [ {
                         "type" : "object",
                         "additionalProperties" : false,
@@ -2298,6 +2299,8 @@
                               "type" : "number"
                             }, {
                               "type" : "boolean"
+                            }, {
+                              "type" : "array"
                             } ]
                           },
                           "readonly" : {
@@ -2384,8 +2387,7 @@
                         }
                       } ]
                     }
-                  },
-                  "additionalProperties" : false
+                  }
                 }
               },
               "allOf" : [ {

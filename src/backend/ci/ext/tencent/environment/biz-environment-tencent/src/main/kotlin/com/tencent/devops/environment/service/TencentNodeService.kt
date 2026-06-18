@@ -1,6 +1,7 @@
-﻿package com.tencent.devops.environment.service
+package com.tencent.devops.environment.service
 
 import com.tencent.devops.common.api.enums.AgentStatus
+import com.tencent.devops.common.api.exception.CustomException
 import com.tencent.devops.common.api.exception.PermissionForbiddenException
 import com.tencent.devops.common.api.pojo.OS
 import com.tencent.devops.common.api.util.AESUtil
@@ -17,6 +18,7 @@ import com.tencent.devops.environment.dao.thirdpartyagent.ThirdPartyAgentDao
 import com.tencent.devops.environment.model.AgentProps
 import com.tencent.devops.environment.model.AgentPropsSource
 import com.tencent.devops.environment.permission.EnvironmentPermissionService
+import com.tencent.devops.environment.pojo.NodeAgentDetail
 import com.tencent.devops.environment.pojo.enums.AgentType
 import com.tencent.devops.environment.pojo.imate.ImateListItem
 import com.tencent.devops.environment.pojo.imate.ImateOriginEngine
@@ -25,6 +27,7 @@ import com.tencent.devops.environment.service.thirdpartyagent.BatchInstallAgentS
 import com.tencent.devops.environment.service.thirdpartyagent.ImportService
 import com.tencent.devops.project.api.service.ServiceProjectResource
 import com.tencent.devops.support.api.service.ServiceIMateResource
+import jakarta.ws.rs.core.Response
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -68,16 +71,16 @@ class TencentNodeService @Autowired constructor(
     ): List<ImateListItem> {
         checkProjectScope(userId, projectId)
         // 只能导入自己创建的团队的
-        // TODO: 测试环境方便测试不校验团队和已安装
+        // TODO: 测试环境方便测试不校验团队
         val imateList =
             client.get(ServiceIMateResource::class).queryUserRobots(userId).data?.filter { it.username == userId }
 //                ?.filter { ImateOriginEngine.teamType(it.clientType) }
                 ?: return emptyList()
-        val installedAgents = emptyList<String>()
-//            thirdPartyAgentDao.getAgentByWorkspaceName(dslContext, projectId, imateList.map { it.clientUuid }.toList())
-//                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
-//                .map { it.createWorkspaceName }
-        return imateList.filter { it.clientUuid !in installedAgents }.map {
+        val installedAgents =
+            agentDao.fetchAgentsByWorkspaceIdGlobal(dslContext, imateList.map { it.clientUuid }.toList(), null)
+                .filter { (it.status != AgentStatus.UN_IMPORT.status || it.status != AgentStatus.UN_IMPORT_OK.status) }
+                .associateBy { it.createWorkspaceName }
+        return imateList.map {
             ImateListItem(
                 name = it.botName,
                 deviceId = it.clientUuid,
@@ -87,7 +90,8 @@ class TencentNodeService @Autowired constructor(
                 engine = ImateOriginEngine.toEngine(it.clientType),
                 status = it.status,
                 createUser = it.username,
-                createTime = it.createdAt
+                createTime = it.createdAt,
+                installedProjectId = installedAgents[it.clientUuid]?.projectId
             )
         }
     }
@@ -118,7 +122,7 @@ class TencentNodeService @Autowired constructor(
                 )
             }
             // 生成节点,如果有说明没导入成功，再次导入
-            val record = agentDao.getAgentByWorkspaceIdGlobal(dslContext, imate.deviceId, projectId)
+            val record = agentDao.getAgentByWorkspaceIdGlobal(dslContext, imate.deviceId, null)
             if (record == null) {
                 val agentId = batchInstallAgentService.genNewAgent(
                     projectId = projectId,
@@ -130,7 +134,14 @@ class TencentNodeService @Autowired constructor(
                     agentProps = AgentProps.emptyBySource(AgentPropsSource.DEVCLOUD)
                 )
                 importService.preImport(projectId, agentId, userId, imate.name)
-            }else{
+            } else {
+                // 防止在不同项目导入
+                if (projectId != record.projectId) {
+                    throw CustomException(
+                        status = Response.Status.BAD_REQUEST,
+                        message = "imported in ${record.projectId}"
+                    )
+                }
                 importService.preImport(projectId, record.id, userId, imate.name)
             }
             // 生成临时1小时TOKEN用来导入鉴权
@@ -145,6 +156,12 @@ class TencentNodeService @Autowired constructor(
             logger.info("batchImportImateNodes install plugin ${projectId}|${imate.deviceId}|$userId|$taskId")
         }
         return true
+    }
+
+    fun getNodeAgentDetail(userId: String, projectId: String, nodeHashId: String): NodeAgentDetail? {
+        return thirdPartyAgentDao.getAgentByNodeId(dslContext, HashUtil.decodeIdToLong(nodeHashId), projectId)?.let {
+            NodeAgentDetail(it.createWorkspaceName)
+        } ?: return null
     }
 
     // 因为现在没有团队imate同步到我们的方式，所以每天轮询
