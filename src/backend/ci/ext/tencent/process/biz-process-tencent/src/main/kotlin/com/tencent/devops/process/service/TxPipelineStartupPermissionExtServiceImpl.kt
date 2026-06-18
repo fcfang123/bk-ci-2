@@ -28,6 +28,7 @@
 package com.tencent.devops.process.service
 
 import com.tencent.devops.common.api.exception.ErrorCodeException
+import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.pipeline.enums.ChannelCode
 import com.tencent.devops.common.pipeline.pojo.BuildParameters
@@ -63,7 +64,9 @@ class TxPipelineStartupPermissionExtServiceImpl @Autowired constructor(
         pipelineParamMap: Map<String, BuildParameters>,
         channelCode: ChannelCode
     ) {
-
+        logger.warn(
+            "checkStartupPermission, $userId|$projectId|$pipelineId|channelCode=$channelCode|pipelineParamMap=${JsonUtil.toJson(pipelineParamMap)}"
+        )
         // 获取节点 hashId
         val nodeHashId = pipelineParamMap[NODE_HASH_ID]?.value?.toString()
         if (nodeHashId.isNullOrBlank()) {
