@@ -42,9 +42,12 @@ import com.tencent.devops.quality.api.v2.ServiceQualityIndicatorResource
 import com.tencent.devops.quality.api.v2.ServiceQualityInterceptResource
 import com.tencent.devops.quality.constant.DEFAULT_CODECC_URL
 import com.tencent.devops.quality.constant.codeccToolUrlPathMap
+import org.slf4j.LoggerFactory
 
 @Suppress("ALL")
 object QualityUtils {
+
+    private val logger = LoggerFactory.getLogger(QualityUtils::class.java)
     /**
      * 获取质量红线结果
      * @param client
@@ -166,7 +169,9 @@ object QualityUtils {
                 "console/codecc/$projectId/task/$taskId/detail?buildId=$buildId'>$value</a>"
         } else {
             var detailValue = logPrompt
+            logger.info("QUALITY|getActualValue|detailValue=$detailValue")
             if (detailValue.isNullOrBlank()) {
+                logger.info("QUALITY|detailValue is null")
                 detailValue = codeccToolUrlPathMap[detail] ?: DEFAULT_CODECC_URL
             }
             val fillDetailUrl = detailValue.replace("##projectId##", projectId)
