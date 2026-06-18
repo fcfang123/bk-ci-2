@@ -28,14 +28,13 @@
 package com.tencent.devops.process.service
 
 import com.tencent.devops.common.api.exception.ErrorCodeException
-import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.pipeline.enums.ChannelCode
 import com.tencent.devops.common.pipeline.pojo.BuildParameters
 import com.tencent.devops.environment.api.TencentServiceNodeService
 import com.tencent.devops.process.constant.ProcessMessageCode
 import com.tencent.devops.process.engine.service.PipelineStartupPermissionExtService
-import com.tencent.devops.process.utils.NODE_HASH_ID
+import com.tencent.devops.process.utils.NODE_AGENT_ID
 import com.tencent.devops.project.api.service.ServiceProjectResource
 import com.tencent.devops.support.api.service.ServiceIMateResource
 import org.slf4j.LoggerFactory
@@ -45,7 +44,7 @@ import org.springframework.stereotype.Service
 /**
  * 内部版启动权限校验：目前仅针对团队项目（projectScope=0）的节点启动进行授权检查。
  *
- * 通过 [NODE_HASH_ID] 获取节点对应的 workspaceName，作为 clientUuid 调用 iMate 授权接口，
+ * 通过 [NODE_AGENT_ID] 获取节点对应的 workspaceName，作为 clientUuid 调用 iMate 授权接口，
  * 当启动人对节点无操作权限时阻断启动。
  */
 @Service
@@ -64,12 +63,10 @@ class TxPipelineStartupPermissionExtServiceImpl @Autowired constructor(
         pipelineParamMap: Map<String, BuildParameters>,
         channelCode: ChannelCode
     ) {
-        logger.warn(
-            "checkStartupPermission, $userId|$projectId|$pipelineId|channelCode=$channelCode|pipelineParamMap=${JsonUtil.toJson(pipelineParamMap)}"
-        )
-        // 获取节点 hashId
-        val nodeHashId = pipelineParamMap[NODE_HASH_ID]?.value?.toString()
-        if (nodeHashId.isNullOrBlank()) {
+
+        // 获取agent hashId
+        val agentHashId = pipelineParamMap[NODE_AGENT_ID]?.value?.toString()
+        if (agentHashId.isNullOrBlank()) {
             return
         }
 
@@ -79,12 +76,13 @@ class TxPipelineStartupPermissionExtServiceImpl @Autowired constructor(
             return
         }
 
-        // 通过节点获取 workspaceName 作为 clientUuid
-        val workspaceName = client.get(TencentServiceNodeService::class)
-            .getNodeAgentDetail(userId, projectId, nodeHashId).data?.workspaceName
+        // 通过节点获取详情
+        val nodeAgentDetail = client.get(TencentServiceNodeService::class)
+            .getNodeAgentDetail(userId, projectId, agentHashId).data
+        val workspaceName = nodeAgentDetail?.workspaceName
         if (workspaceName.isNullOrBlank()) {
             logger.warn(
-                "workspaceName not found, skip permission check|$projectId|$pipelineId|node=$nodeHashId"
+                "workspaceName not found, skip permission check|$projectId|$pipelineId|agentHashId=$agentHashId"
             )
             return
         }
@@ -92,13 +90,14 @@ class TxPipelineStartupPermissionExtServiceImpl @Autowired constructor(
         val authorized = client.get(ServiceIMateResource::class)
             .checkAuthorization(username = userId, clientUuid = workspaceName).data?.authorized ?: false
         if (!authorized) {
+            val nodeDisplayInfo = "${nodeAgentDetail.displayName}（${nodeAgentDetail.ip}）"
             logger.warn(
                 "startup permission denied|$projectId|$pipelineId|$userId|" +
-                    "node=$nodeHashId|workspace=$workspaceName"
+                    "agentHashId=$agentHashId|workspace=$workspaceName"
             )
             throw ErrorCodeException(
                 errorCode = ProcessMessageCode.ERROR_PIPELINE_START_NODE_NO_PERMISSION,
-                params = arrayOf(userId, nodeHashId)
+                params = arrayOf(userId, nodeDisplayInfo)
             )
         }
     }
