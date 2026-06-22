@@ -64,10 +64,7 @@ interface ApigwTXProjectResourceV4 {
         apigwType: String?,
         @Parameter(description = "用户ID", required = true, example = AUTH_HEADER_DEVOPS_USER_ID_DEFAULT_VALUE)
         @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
-        userId: String,
-        @Parameter(description = "项目描述", required = false)
-        @QueryParam("description")
-        description: String?
+        userId: String
     ): Result<ProjectVO>
 
     @Operation(summary = "获取项目运营产品相关信息", tags = ["v4_app_list_project_product_infos"])
