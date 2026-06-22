@@ -556,8 +556,6 @@ object ProcessMessageCode {
     const val ERROR_PIPELINE_BATCH_TASK_STATUS_CAN_NOT_RETRY = "2101679" // 流水线批量任务{0}当前状态为{1}，不能重试
     const val ERROR_PIPELINE_BATCH_TASK_DETAIL_CAN_NOT_RETRY = "2101680" // 流水线批量任务明细{0}当前状态为{1}，不能重试
     const val ERROR_PIPELINE_BATCH_TASK_NOTHING_TO_RETRY = "2101681" // 流水线批量任务{0}没有可重试的失败项
-    // 构建执行相关错误码（2101500-2101599）
-    const val ERROR_PIPELINE_START_NODE_NO_PERMISSION = "2101500" // 用户[{0}]没有节点[{1}]的操作权限，无法启动流水线
 
     const val BK_SUCCESSFULLY_DISTRIBUTED = "bkSuccessfullyDistributed" // 跨项目构件分发成功，共分发了{0}个文件
     const val BK_SUCCESSFULLY_FAILED = "bkSuccessfullyFailed" // 跨项目构件分发失败，
