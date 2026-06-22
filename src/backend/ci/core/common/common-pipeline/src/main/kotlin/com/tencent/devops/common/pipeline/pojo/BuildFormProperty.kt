@@ -111,8 +111,7 @@ data class BuildFormProperty(
     )
     var asInstanceInput: Boolean? = null,
     @get:Schema(title = "复杂参数列表[仅type==CUSTOM_PARAM有效]", required = false)
-    var fields: List<BuildFormProperty>? = null
-    var asInstanceInput: Boolean? = null,
+    var fields: List<BuildFormProperty>? = null,
     @get:Schema(title = "所属公共变量组名称", required = false)
     var varGroupName: String? = null,
     @get:Schema(title = "所属公共变量组版本", required = false)
