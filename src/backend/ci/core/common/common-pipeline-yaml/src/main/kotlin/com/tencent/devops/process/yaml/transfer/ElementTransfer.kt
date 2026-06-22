@@ -128,6 +128,7 @@ class ElementTransfer @Autowired(required = false) constructor(
     fun baseTriggers2yaml(elements: List<Element>, aspectWrapper: PipelineTransferAspectWrapper): TriggerOn? {
         val triggerOn = lazy { TriggerOn() }
         val schedules = mutableListOf<SchedulesRule>()
+        val tapds = mutableListOf<TapdRule>()
         triggerOn.value.manual = ManualRule(
             enable = false
         )
@@ -211,11 +212,14 @@ class ElementTransfer @Autowired(required = false) constructor(
                 return@forEach
             }
             if (element is TapdWebHookTriggerElement) {
-                triggerOn.value.tapd = tapd2YamlRule(element)
+                tapds.add(tapd2YamlRule(element))
             }
         }
         if (schedules.isNotEmpty()) {
             triggerOn.value.schedules = schedules
+        }
+        if (tapds.isNotEmpty()){
+            triggerOn.value.tapd = tapds
         }
         if (triggerOn.isInitialized()) {
             aspectWrapper.setYamlTriggerOn(
