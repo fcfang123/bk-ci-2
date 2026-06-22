@@ -241,13 +241,13 @@ class ElementTransfer @Autowired(required = false) constructor(
             tapdProjectId = input.tapdProjectId,
             eventType = input.eventType?.value,
             action = includeActions,
-            users = input.includeUsers,
-            usersIgnore = input.excludeUsers,
-            owners = input.includeOwner,
-            ownersIgnore = input.excludeOwner,
-            labels = input.includeLabels?.split(","),
-            labelsIgnore = input.excludeLabels?.split(","),
-            priorities = input.includePriority?.split(",")
+            users = input.includeUsers.nonEmptyOrNull(),
+            usersIgnore = input.excludeUsers.nonEmptyOrNull(),
+            owners = input.includeOwner.nonEmptyOrNull(),
+            ownersIgnore = input.excludeOwner.nonEmptyOrNull(),
+            labels = input.includeLabels?.takeIf { it.isNotBlank() }?.split(","),
+            labelsIgnore = input.excludeLabels?.takeIf { it.isNotBlank() }?.split(","),
+            priorities = input.includePriority?.takeIf { it.isNotBlank() }?.split(",")
         )
     }
 
@@ -743,4 +743,6 @@ class ElementTransfer @Autowired(required = false) constructor(
     protected fun makeServiceElementList(job: Job): MutableList<Element> {
         return mutableListOf()
     }
+
+    private fun List<String>?.nonEmptyOrNull() = this?.ifEmpty { null }
 }
