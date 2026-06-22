@@ -36,6 +36,7 @@ import com.tencent.devops.common.pipeline.enums.VersionStatus
 import com.tencent.devops.common.redis.RedisOperation
 import com.tencent.devops.process.constant.ProcessMessageCode
 import com.tencent.devops.process.pojo.pipeline.DeployTemplateResult
+import com.tencent.devops.process.pojo.`var`.dto.PublicVarGroupReferDTO
 import com.tencent.devops.process.service.template.v2.PipelineTemplateGenerator
 import com.tencent.devops.process.service.template.v2.PipelineTemplateModelLock
 import com.tencent.devops.process.service.template.v2.PipelineTemplatePersistenceService
@@ -44,7 +45,6 @@ import com.tencent.devops.process.service.template.v2.PipelineTemplateSettingSer
 import com.tencent.devops.process.service.template.v2.version.PipelineTemplateVersionCreateContext
 import com.tencent.devops.process.yaml.PipelineYamlReleaseService
 import com.tencent.devops.process.service.`var`.PublicVarGroupReferManageService
-import com.tencent.devops.process.pojo.`var`.dto.PublicVarGroupReferDTO
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service

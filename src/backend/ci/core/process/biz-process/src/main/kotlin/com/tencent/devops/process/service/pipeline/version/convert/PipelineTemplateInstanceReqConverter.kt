@@ -176,7 +176,7 @@ class PipelineTemplateInstanceReqConverter(
             val pipelineBasicInfo = pipelineResourceFactory.createPipelineBasicInfo(
                 projectId = projectId,
                 pipelineId = newPipelineId,
-                channelCode = ChannelCode.BS,
+                channelCode = ChannelCode.getRequestChannelCode(),
                 pipelineName = pipelineName,
                 pipelineDesc = null,
                 pipelineDisable = pipelineInfo?.locked
@@ -342,7 +342,7 @@ class PipelineTemplateInstanceReqConverter(
                 userId = userId,
                 create = pipelineId == null,
                 versionStatus = versionStatus,
-                channelCode = ChannelCode.BS,
+                channelCode = ChannelCode.getRequestChannelCode(),
                 yamlFileInfo = yamlFileInfo,
                 pipelineDialect = pipelineDialect
             )
@@ -445,7 +445,7 @@ class PipelineTemplateInstanceReqConverter(
                 projectId = projectId,
                 pipelineId = pipelineId,
                 pipelineName = pipelineName,
-                channelCode = ChannelCode.BS
+                channelCode = ChannelCode.getRequestChannelCode()
             )
         }
         val pacSetting = enablePac.takeIf { it }?.let {

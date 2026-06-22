@@ -45,6 +45,7 @@ import com.tencent.devops.process.service.pipeline.version.PipelineVersionGenera
 import com.tencent.devops.process.service.pipeline.version.PipelineVersionPersistenceService
 import com.tencent.devops.process.yaml.PipelineYamlReleaseService
 import com.tencent.devops.process.service.`var`.PublicVarGroupReferManageService
+
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service

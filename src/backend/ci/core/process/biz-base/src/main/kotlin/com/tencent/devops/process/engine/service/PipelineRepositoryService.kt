@@ -63,6 +63,7 @@ import com.tencent.devops.common.pipeline.option.MatrixControlOption
 import com.tencent.devops.common.pipeline.pojo.BuildNo
 import com.tencent.devops.common.pipeline.pojo.MatrixPipelineInfo
 import com.tencent.devops.common.pipeline.pojo.PipelineModelAndSetting
+import com.tencent.devops.common.pipeline.pojo.element.market.MarketEventAtomElement
 import com.tencent.devops.common.pipeline.pojo.element.trigger.ManualTriggerElement
 import com.tencent.devops.common.pipeline.pojo.setting.PipelineRunLockType
 import com.tencent.devops.common.pipeline.pojo.setting.PipelineSetting
@@ -124,6 +125,7 @@ import com.tencent.devops.process.pojo.`var`.dto.PublicVarGroupReferDTO
 import com.tencent.devops.process.service.PipelineAsCodeService
 import com.tencent.devops.process.service.PipelineOperationLogService
 import com.tencent.devops.process.service.label.PipelineGroupService
+import com.tencent.devops.process.service.PipelineVisibilityService
 import com.tencent.devops.process.service.pipeline.PipelineSettingVersionService
 import com.tencent.devops.process.service.pipeline.PipelineTransferYamlService
 import com.tencent.devops.process.service.`var`.PublicVarGroupReferManageService
@@ -137,6 +139,7 @@ import com.tencent.devops.process.utils.PipelineVarUtil
 import com.tencent.devops.process.utils.PipelineVersionUtils
 import com.tencent.devops.process.yaml.utils.NotifyTemplateUtils
 import com.tencent.devops.project.api.service.ServiceAllocIdResource
+import com.tencent.devops.store.pojo.common.BK_STORE_CREATIVE_STREAM_MANUAL_TRIGGER
 import jakarta.ws.rs.core.Response
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
@@ -189,6 +192,7 @@ class PipelineRepositoryService constructor(
     private val pipelineInfoService: PipelineInfoService,
     private val pipelineTemplateInfoDao: PipelineTemplateInfoDao,
     private val pipelineGroupService: PipelineGroupService,
+    private val pipelineVisibilityService: PipelineVisibilityService,
     private val publicVarGroupReferManageService: PublicVarGroupReferManageService
 ) {
 
@@ -244,6 +248,7 @@ class PipelineRepositoryService constructor(
     @Value("\${project.callback.aes-key}")
     private val aesKey = ""
 
+    @SuppressWarnings("NestedBlockDepth")
     fun deployPipeline(
         model: Model,
         projectId: String,
@@ -297,9 +302,21 @@ class PipelineRepositoryService constructor(
         var canElementSkip = false
         run lit@{
             triggerContainer.elements.forEach {
-                if (it is ManualTriggerElement && it.elementEnabled()) {
+                val targetElement = it is ManualTriggerElement || if (channelCode == ChannelCode.CREATIVE_STREAM) {
+                    it is MarketEventAtomElement && it.atomCode == BK_STORE_CREATIVE_STREAM_MANUAL_TRIGGER
+                } else {
+                    false
+                }
+                if (targetElement && it.elementEnabled()) {
                     canManualStartup = true
-                    canElementSkip = it.canElementSkip ?: false
+                    canElementSkip = when (it) {
+                        is ManualTriggerElement -> it.canElementSkip ?: false
+                        is MarketEventAtomElement -> {
+                            val input = it.data["input"] as Map<String, Any>? ?: emptyMap()
+                            input["canElementSkip"] as? Boolean ?: false
+                        }
+                        else -> false
+                    }
                     return@lit
                 }
             }
@@ -684,14 +701,14 @@ class PipelineRepositoryService constructor(
      * 初始化默认的流水线setting
      */
     fun createDefaultSetting(
-        projectId: String,
-        pipelineId: String,
-        pipelineName: String,
+        projectId: String = "",
+        pipelineId: String = "",
+        pipelineName: String = "",
         channelCode: ChannelCode
     ): PipelineSetting {
         // 空白流水线设置初始化
         val maxPipelineResNum = calculateMaxPipelineResNum(channelCode)
-        val notifyTypes = if (channelCode == ChannelCode.BS) {
+            val notifyTypes = if (channelCode == ChannelCode.BS || channelCode == ChannelCode.CREATIVE_STREAM) {
             pipelineInfoExtService.failNotifyChannel()
         } else {
             ""
@@ -911,6 +928,15 @@ class PipelineRepositoryService constructor(
                     channel = channelCode.name,
                     modelTasks = modelTasks.toList()
                 )
+                // 创作流,可见性默认添加创建者
+                if (channelCode == ChannelCode.CREATIVE_STREAM) {
+                    pipelineVisibilityService.initVisibility(
+                        transactionContext = transactionContext,
+                        userId = userId,
+                        projectId = projectId,
+                        pipelineId = pipelineId
+                    )
+                }
             }
         } finally {
             lock.unlock()
@@ -1766,6 +1792,7 @@ class PipelineRepositoryService constructor(
                     templatePipelineDao.delete(transactionContext, projectId, pipelineId)
                     pipelineYamlInfoDao.deleteByPipelineId(transactionContext, projectId, pipelineId)
                     pipelineYamlVersionDao.deleteByPipelineId(transactionContext, projectId, pipelineId)
+                    pipelineVisibilityService.deleteByPipelineId(transactionContext, projectId, pipelineId)
                 } else {
                     // 删除前改名，防止名称占用
                     val deleteTime = org.joda.time.LocalDateTime.now().toString("yyMMddHHmmSS")
@@ -1857,7 +1884,7 @@ class PipelineRepositoryService constructor(
     fun isPipelineExist(
         projectId: String,
         pipelineName: String,
-        channelCode: ChannelCode = ChannelCode.BS,
+        channelCode: ChannelCode = ChannelCode.getRequestChannelCode(),
         excludePipelineId: String?
     ): Boolean {
         return pipelineInfoDao.isNameExist(dslContext, projectId, pipelineName, channelCode, excludePipelineId)
@@ -2037,10 +2064,10 @@ class PipelineRepositoryService constructor(
                 try {
                     ChannelCode.valueOf(it)
                 } catch (e: IllegalArgumentException) {
-                    logger.warn("Invalid channel code: $it, using default ChannelCode.BS")
-                    ChannelCode.BS
+                    logger.warn("Invalid channel code: $it, using default channel code")
+                    ChannelCode.getRequestChannelCode()
                 }
-            } ?: ChannelCode.BS
+            } ?: ChannelCode.getRequestChannelCode()
             val processedSetting = processMaxPipelineResNumIfNull(setting, channelCode)
             if (!isTemplate && versionStatus.isReleasing()) pipelineInfoDao.update(
                 dslContext = transactionContext,
@@ -2547,11 +2574,14 @@ class PipelineRepositoryService constructor(
     /**
      * 根据model获取触发参数，兼容级联参数
      */
-    fun getTriggerParams(triggerContainer: TriggerContainer): Map<String, String> {
+    fun getTriggerParams(
+        triggerContainer: TriggerContainer,
+        inputParams: Map<String, String>? = null
+    ): Map<String, String> {
         val startParams = mutableMapOf<String, String>()
         triggerContainer.params.forEach { param ->
             val paramKey = param.id
-            val paramDefaultValue = param.defaultValue
+            val paramDefaultValue = inputParams?.get(param.id) ?: param.defaultValue
             val paramType = param.type
             if (CascadePropertyUtils.supportCascadeParam(paramType)) {
                 CascadePropertyUtils.parseDefaultValue(
