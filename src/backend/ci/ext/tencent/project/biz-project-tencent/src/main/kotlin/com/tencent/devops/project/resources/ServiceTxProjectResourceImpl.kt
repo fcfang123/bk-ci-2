@@ -227,8 +227,8 @@ class ServiceTxProjectResourceImpl @Autowired constructor(
         return Result(projectLocalService.getOrCreateRemoteDevProject(userId))
     }
 
-    override fun getOrCreatePersonalProject(userId: String, description: String?): Result<ProjectVO> {
-        return Result(projectLocalService.getOrCreatePersonalProject(userId, description))
+    override fun getOrCreatePersonalProject(userId: String): Result<ProjectVO> {
+        return Result(projectLocalService.getOrCreatePersonalProject(userId))
     }
 
     override fun getOrCreateRdsProject(userId: String, projectId: String, projectName: String): Result<ProjectVO?> {

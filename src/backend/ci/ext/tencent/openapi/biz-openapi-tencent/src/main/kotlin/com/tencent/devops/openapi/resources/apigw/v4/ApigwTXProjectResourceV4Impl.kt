@@ -17,11 +17,10 @@ class ApigwTXProjectResourceV4Impl constructor(
     override fun getOrCreatePersonalProject(
         appCode: String?,
         apigwType: String?,
-        userId: String,
-        description: String?
+        userId: String
     ): Result<ProjectVO> {
         logger.info("OPENAPI_TX_PROJECT_V4|$appCode|$apigwType|get_or_create_personal_project|$userId")
-        return client.get(ServiceTxProjectResource::class).getOrCreatePersonalProject(userId, description)
+        return client.get(ServiceTxProjectResource::class).getOrCreatePersonalProject(userId)
     }
 
     override fun listProjectProductInfos(

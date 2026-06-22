@@ -182,10 +182,7 @@ interface ServiceTxProjectResource {
     fun getOrCreatePersonalProject(
         @Parameter(description = "用户ID", required = true, example = AUTH_HEADER_DEVOPS_USER_ID_DEFAULT_VALUE)
         @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
-        userId: String,
-        @Parameter(description = "项目描述", required = false)
-        @QueryParam("description")
-        description: String?
+        userId: String
     ): Result<ProjectVO>
 
     @GET
