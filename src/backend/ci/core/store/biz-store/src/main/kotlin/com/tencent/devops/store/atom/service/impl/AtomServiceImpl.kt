@@ -129,8 +129,8 @@ import com.tencent.devops.store.pojo.common.KEY_RECOMMEND_FLAG
 import com.tencent.devops.store.pojo.common.KEY_SERVICE_SCOPE
 import com.tencent.devops.store.pojo.common.KEY_UPDATE_TIME
 import com.tencent.devops.store.common.dao.ClassifyDao
-import com.tencent.devops.store.pojo.atom.AtomUpgradeRequest
 import com.tencent.devops.store.pojo.atom.AtomGroupQueryParam
+import com.tencent.devops.store.pojo.atom.AtomUpgradeRequest
 import com.tencent.devops.store.pojo.common.UnInstallReq
 import com.tencent.devops.store.pojo.common.honor.HonorInfo
 import com.tencent.devops.store.pojo.common.index.StoreIndexInfo
@@ -972,7 +972,8 @@ abstract class AtomServiceImpl @Autowired constructor() : AtomService {
                 data = false,
                 language = I18nUtil.getLanguage(userId)
             )
-        val classType = handleClassType(atomRequest.os)
+        // 通用触发事件信息保存到T_ATOM表时，需要额外指定classType
+        val classType = atomRequest.targetClassType ?: handleClassType(atomRequest.os)
         atomRequest.os.sort() // 给操作系统排序
         atomDao.addAtomFromOp(dslContext, userId, id, classType, atomRequest)
         return Result(true)
@@ -1589,15 +1590,22 @@ abstract class AtomServiceImpl @Autowired constructor() : AtomService {
                 data = false,
                 language = I18nUtil.getLanguage(userId)
             )
-        val classType = handleClassType(atomRequest.os)
+        val classType = atomRequest.targetClassType ?: handleClassType(atomRequest.os)
         atomRequest.os.sort() // 给操作系统排序
-        atomDao.upgradeAtom(
-            dslContext = dslContext,
-            userId = userId,
-            id = id,
-            classType = classType,
-            atomRequest = atomRequest
-        )
+        dslContext.transaction { t ->
+            val context = DSL.using(t)
+            // 获取历史最新
+            atomDao.getLatestAtomByCode(context, atomRequest.atomCode)?.let {
+                atomDao.cleanLatestFlagById(context, it.id)
+            }
+            atomDao.upgradeAtom(
+                dslContext = context,
+                userId = userId,
+                id = id,
+                classType = classType,
+                atomRequest = atomRequest
+            )
+        }
         return Result(true)
     }
 
@@ -1620,8 +1628,8 @@ abstract class AtomServiceImpl @Autowired constructor() : AtomService {
                 queryFitAgentBuildLessAtomFlag = null,
                 recommendFlag = null
             ),
-            page = 1,
-            pageSize = Int.MAX_VALUE
+            page = null,
+            pageSize = null
         )
         val atomCodes = queryResult.atoms?.map { it[KEY_ATOM_CODE] as String }?.toSet() ?: emptySet()
         return atomDao.getAtomGroupCount(
@@ -1629,9 +1637,5 @@ abstract class AtomServiceImpl @Autowired constructor() : AtomService {
             atomGroupQueryParam = atomGroupQueryParam,
             atomCodes = atomCodes
         )
-    }
-
-    override fun exists(atomCode: String): Result<Boolean> {
-        return Result(atomDao.countByCode(dslContext, atomCode) > 0)
     }
 }
