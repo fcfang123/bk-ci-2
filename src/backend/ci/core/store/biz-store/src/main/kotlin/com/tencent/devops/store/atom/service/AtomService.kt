@@ -37,7 +37,6 @@ import com.tencent.devops.store.pojo.atom.AtomResp
 import com.tencent.devops.store.pojo.atom.AtomRespItem
 import com.tencent.devops.store.pojo.atom.AtomRunInfo
 import com.tencent.devops.store.pojo.atom.AtomUpdateRequest
-import com.tencent.devops.store.pojo.atom.AtomUpgradeRequest
 import com.tencent.devops.store.pojo.atom.InstalledAtom
 import com.tencent.devops.store.pojo.atom.PipelineAtom
 import com.tencent.devops.store.pojo.atom.AtomGroupQueryParam
@@ -209,11 +208,6 @@ interface AtomService {
     fun getAtomId(atomCode: String, version: String): String?
 
     /**
-     * 升级插件
-     */
-    fun upgradeAtom(userId: String, atomRequest: AtomUpgradeRequest): Result<Boolean>
-
-    /**
      * 统计插件分组信息
      * @param userId 用户ID
      * @param atomGroupQueryParam 插件分组查询参数
@@ -223,9 +217,4 @@ interface AtomService {
         userId: String,
         atomGroupQueryParam: AtomGroupQueryParam
     ): List<Pair<String, Int>>
-
-    /**
-     * 判断插件是否存在
-     */
-    fun exists(atomCode: String): Result<Boolean>
 }
