@@ -36,7 +36,7 @@ export default defineComponent({
         const pluginVar = props.variable as PluginOutputVariable
         return `\${{ steps.${pluginVar.stepId}.outputs.${pluginVar.id} }}`
       }
-      return `\${{ ci.${props.variable.name ?? props.variable.id} }}`
+      return `\${{ ${props.variable.name ?? props.variable.id} }}`
     }
 
     // Handle copy reference
@@ -44,7 +44,6 @@ export default defineComponent({
       event.stopPropagation()
       const reference = getReference()
       navigator.clipboard.writeText(reference).then(() => {
-        Message({ theme: 'success', message: t('flow.variable.copySuccess') })
         emit('copy', reference)
       })
     }

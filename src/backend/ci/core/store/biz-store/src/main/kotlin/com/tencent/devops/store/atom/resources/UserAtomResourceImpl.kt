@@ -82,6 +82,7 @@ class UserAtomResourceImpl @Autowired constructor(
         queryProjectAtomFlag: Boolean,
         fitOsFlag: Boolean?,
         queryFitAgentBuildLessAtomFlag: Boolean?,
+        installed: Boolean?,
         page: Int,
         pageSize: Int,
         ownerStoreCode: String?
@@ -102,6 +103,7 @@ class UserAtomResourceImpl @Autowired constructor(
             fitOsFlag = fitOsFlag,
             queryFitAgentBuildLessAtomFlag = queryFitAgentBuildLessAtomFlag,
             queryProjectAtomFlag = queryProjectAtomFlag,
+            installed = installed,
             ownerStoreCode = ownerStoreCode.takeIf { !it.isNullOrBlank() && it != BK_STORE_ALL_TRIGGER }
         )
         return atomService.getPipelineAtoms(
