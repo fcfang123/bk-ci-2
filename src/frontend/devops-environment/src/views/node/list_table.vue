@@ -445,7 +445,7 @@
                                     </bk-button>
                                     <!-- 未安装Agent -->
                                     <bk-button
-                                        v-if="props.row.nodeStatus === 'NOT_INSTALLED' || (props.row.nodeStatus === 'RUNNING' && props.row.agentStatus === 0)"
+                                        v-if="(props.row.nodeStatus === 'NOT_INSTALLED' || (props.row.nodeStatus === 'RUNNING' && props.row.agentStatus === 0) && !isCreateResType)"
                                         v-perm="{
                                             hasPermission: props.row.canEdit,
                                             disablePermissionApi: true,
@@ -468,7 +468,7 @@
                                 <template v-else>
                                     <!-- Agent异常 - 重装Agent -->
                                     <bk-button
-                                        v-if="props.row.nodeStatus === 'ABNORMAL'"
+                                        v-if="props.row.nodeStatus === 'ABNORMAL' && !isCreateResType"
                                         v-perm="{
                                             hasPermission: props.row.canEdit,
                                             disablePermissionApi: true,

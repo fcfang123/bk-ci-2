@@ -284,7 +284,8 @@
             "scheduledTasksTips": "Triggered by scheduled tasks. Requires user login after reboot to execute. Recommended when pipeline needs to launch UI applications (e.g., browser automation tests)."
         },
         "switchRunningAccount": "Auto Switch Running Account",
-        "switchAccountTips": "Defaults to running as system user 'system'. To access user-specific data (e.g., environment variables), account switching is required. Supports automatic switching with credentials or manual switching after installation."
+        "switchAccountTips": "Defaults to running as syste 'system'. To access user-specific data (e.g., environment variables), account switching is required. Supports automatic switching with credentials or manual switching after installation.",
+        "operatorStatus": "Operator Status"
     },
     "nodeTypeMap": {
         "CC": "CC",
@@ -326,7 +327,6 @@
     "查看更多指标监控": "View more metric monitoring",
     "nodeSearchTips": "Keywords / IP / Alias / Importer / Last Modifier",
     "installAgent": "Install Agent",
-    "reinstallAgent": "Reinstall Agent",
     "reImport": "ReImport",
     "failedImport": "Filed import",
     "nextCan": "Next, you can:",
@@ -674,6 +674,10 @@
     "relatedCreativeFlow": "Related Creative Flow",
     "workspace": "Workspace",
     "enableTitle": "Start/Stop",
+    "operatorStatus": {
+        "NORMAL": "Normal",
+        "OPERATOR_CHANGED": "Operator Changed"
+    },
     "schedulingStrategy": "Scheduling strategy",
     "scheduling": {
         "alertTips": "When assigning nodes to a Job, search for available nodes in the environment according to the following scheduling strategy order. If no nodes are found after all strategies are executed, wait in queue; periodically search for available nodes again, queue timeout is based on Job settings.",
