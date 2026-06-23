@@ -134,7 +134,7 @@
                     service: () => this.requestServiceDetailByCode(code),
                     devx: () => this.getComponentDetail(code)
                 }
-                const res = await methodUrl[this.type](code)
+                const res = await methodUrl[this.type]()
                 
                 this.setDetail(res)
             },
