@@ -199,8 +199,7 @@ class DevxReleaseSpecBusServiceImpl @Autowired constructor(
     override fun doStoreCreatePostBus(
         userId: String,
         storeCode: String,
-        storeType: StoreTypeEnum,
-        storeCreateRequest: StoreCreateRequest
+        storeType: StoreTypeEnum
     ) {
         txStoreBelongDeptService.initStoreBelongDept(
             userId = userId,
@@ -496,13 +495,6 @@ class DevxReleaseSpecBusServiceImpl @Autowired constructor(
         }
         return startParamMap
     }
-
-    override fun doStoreUpdatePostBus(
-        userId: String,
-        storeCode: String,
-        storeType: StoreTypeEnum,
-        storeUpdateRequest: StoreUpdateRequest
-    ) = Unit
 
     private fun processScriptContent(script: String, startParamMap: MutableMap<String, String>) {
         if (JsonSchemaUtil.validateJson(script)) {
