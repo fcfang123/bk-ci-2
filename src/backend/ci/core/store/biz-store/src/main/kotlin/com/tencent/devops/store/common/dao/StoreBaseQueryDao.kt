@@ -577,7 +577,6 @@ class StoreBaseQueryDao {
         dslContext: DSLContext,
         storeCode: String,
         storeType: StoreTypeEnum,
-        storeStatusList: List<String>? = null,
         page: Int? = null,
         pageSize: Int? = null
     ): Result<TStoreBaseRecord> {
@@ -585,9 +584,6 @@ class StoreBaseQueryDao {
             val conditions = mutableListOf<Condition>()
             conditions.add(STORE_CODE.eq(storeCode))
             conditions.add(STORE_TYPE.eq(storeType.type.toByte()))
-            if (!storeStatusList.isNullOrEmpty()) {
-                conditions.add(STATUS.`in`(storeStatusList))
-            }
             val baseStep = dslContext.selectFrom(this)
                 .where(conditions)
                 .orderBy(CREATE_TIME.desc())
