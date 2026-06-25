@@ -128,6 +128,10 @@
     import { allVersionKeyList } from '@/utils/pipelineConst'
     import { deepCopy, navConfirm } from '@/utils/util'
     import ParamGroup from './children/param-group'
+    import {
+        getInvalidDisplayConditionDependents,
+        hasDisplayConditionOperatorSupportChanged
+    } from './displayConditionUtils'
     import PipelineParamForm from './pipeline-param-form'
     import ManageVariableGroup from '@/components/PublicVariable/ManageVariableGroup/'
 
@@ -310,6 +314,9 @@
                 const formListValid = this.$refs.pipelineParamFormRef?.validateFormList?.() ?? true
                 // 单选、复选类型， 需要先校验options
                 const optionValid = await this.validParamOptions()
+                if (optionValid && !this.validDisplayConditionOperator()) {
+                    return
+                }
                 this.$validator.validate('pipelineParam.*').then((result) => {
                     const {isInvalid, ...param} = this.sliderEditItem
                     if (result && optionValid && formListValid) {
@@ -325,6 +332,26 @@
             },
             handleSaveVariableByGroup (list) {
                 this.updateContainerParams('params', [...list, ...this.versions])
+            },
+            validDisplayConditionOperator () {
+                if (this.editIndex < 0) return true
+
+                const prevParam = this.globalParams[this.editIndex]
+                const nextParam = this.sliderEditItem
+                if (!hasDisplayConditionOperatorSupportChanged(prevParam, nextParam)) {
+                    return true
+                }
+
+                const invalidList = getInvalidDisplayConditionDependents(this.globalParams, nextParam)
+                if (!invalidList.length) return true
+
+                const paramName = nextParam.name || nextParam.id
+                const invalidNames = invalidList.map(({ param, operator }) => `${param.name || param.id}(${operator})`).join('、')
+                this.$bkMessage({
+                    theme: 'warning',
+                    message: this.$t('editPage.displayConditionOperatorInvalidTips', [paramName, invalidNames])
+                })
+                return false
             },
             updateEditItem (name, value) {
                 Object.assign(this.sliderEditItem, { [name]: value })
