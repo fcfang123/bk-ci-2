@@ -41,6 +41,7 @@
         "CHANGE_IMPORT_USER": "インポートユーザーをリセットしました"
     },
     "operateReasonPrefix": "、理由：",
+    "operateContentPrefix": "、内容：",
     "addProject": "プロジェクトを追加",
     "environmentManage": "環境管理",
     "environmentList": "環境一覧",

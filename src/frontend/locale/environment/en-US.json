@@ -41,6 +41,7 @@
         "CHANGE_IMPORT_USER": "Reset importer"
     },
     "operateReasonPrefix": ", reason: ",
+    "operateContentPrefix": ", content: ",
     "addProject": "Add Project",
     "environmentManage": "Envs",
     "environmentList": "Pools list",
