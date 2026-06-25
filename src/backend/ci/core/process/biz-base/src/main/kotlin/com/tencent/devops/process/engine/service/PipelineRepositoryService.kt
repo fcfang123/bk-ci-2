@@ -2511,7 +2511,7 @@ class PipelineRepositoryService constructor(
         return try {
             client.get(ServiceAuthAuthorizationResource::class).getResourceAuthorization(
                 projectId = projectId,
-                resourceType = AuthResourceType.PIPELINE_DEFAULT.value,
+                resourceType = AuthResourceType.getAuthResourceTypeByChannel(AuthResourceType.PIPELINE_DEFAULT).value,
                 resourceCode = pipelineId
             ).data
         } catch (ignored: Exception) {
