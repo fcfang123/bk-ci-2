@@ -126,7 +126,8 @@ class AuthResourceDao {
             return dslContext.selectFrom(this)
                 .where(PROJECT_CODE.eq(projectCode))
                 .and(RESOURCE_TYPE.eq(resourceType))
-                .and(RESOURCE_CODE.eq(resourceCode))
+                // 显式使用区分大小写的排序规则比较,避免列 collation 为大小写不敏感时
+                .and(RESOURCE_CODE.collate(CASE_SENSITIVE_COLLATION).eq(resourceCode))
                 .fetchOne()
         }
     }
@@ -531,5 +532,10 @@ class AuthResourceDao {
                 updateTime = updateTime
             )
         }
+    }
+
+    companion object {
+        // 资源ID区分大小写的排序规则,确保按 RESOURCE_CODE 精确查询时大小写敏感
+        private const val CASE_SENSITIVE_COLLATION = "utf8mb4_bin"
     }
 }
