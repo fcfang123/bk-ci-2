@@ -50,7 +50,9 @@ data class WindowsWorkspaceCreate(
     @get:Schema(title = "创建时指定污点")
     val specifyTaints: String? = null,
     @get:Schema(title = "云桌面类型")
-    val ownerType: WorkspaceOwnerType? = null
+    val ownerType: WorkspaceOwnerType? = null,
+    @get:Schema(title = "云桌面实例类型，支持 cvd-personal / cvd-team")
+    val workspaceKind: WorkspaceKind? = null
 )
 
 @Schema(title = "自定义数据盘信息")

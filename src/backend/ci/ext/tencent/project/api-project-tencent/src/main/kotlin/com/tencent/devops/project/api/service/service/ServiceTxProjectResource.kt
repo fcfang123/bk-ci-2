@@ -177,6 +177,15 @@ interface ServiceTxProjectResource {
     ): Result<ProjectVO?>
 
     @GET
+    @Path("/personal/userProject")
+    @Operation(summary = "获取或创建用户个人项目，不存在时自动创建")
+    fun getOrCreatePersonalProject(
+        @Parameter(description = "用户ID", required = true, example = AUTH_HEADER_DEVOPS_USER_ID_DEFAULT_VALUE)
+        @HeaderParam(AUTH_HEADER_DEVOPS_USER_ID)
+        userId: String
+    ): Result<ProjectVO>
+
+    @GET
     @Path("/enNames/organization")
     @Operation(summary = "查询用户项目")
     fun getProjectEnNamesByOrganization(
