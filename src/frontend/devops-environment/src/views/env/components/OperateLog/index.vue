@@ -53,7 +53,7 @@
                     <template slot-scope="{ row }">
                         {{ $t(`environment.operateNameMap.${row.operateName}`, '') }}
                         <template v-if="row.operateContent && row.operateContent.content">
-                            {{ $t('environment.operateReasonPrefix') }}{{ row.operateContent.content }}
+                            {{ nodeStatusField.includes(row.operateName) ? $t('environment.operateReasonPrefix') : $t('environment.operateContentPrefix') }}{{ row.operateContent.content }}
                         </template>
                     </template>
                 </bk-table-column>
@@ -104,7 +104,7 @@
 
             const logLoading = ref(false)
             const selectedOperator = ref('')
-
+            const nodeStatusField  = ref(['ENABLE_NODE', 'DISABLE_NODE'])
             /**
              * 加载操作日志数据
              */
@@ -209,6 +209,7 @@
                 logLoading,
                 memberLoading,
                 selectedOperator,
+                nodeStatusField,
                 formatTime,
                 handleOperatorChange,
                 handleOperatorClear,

@@ -42,6 +42,7 @@
         "CHANGE_IMPORT_USER": "重置了导入人"
     },
     "operateReasonPrefix": "，原因：",
+    "operateContentPrefix": "，内容：",
     "addProject": "添加项目",
     "environmentManage": "环境管理",
     "environmentList": "环境列表",
