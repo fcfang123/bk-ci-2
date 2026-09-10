@@ -33,6 +33,11 @@ import io.swagger.v3.oas.annotations.media.Schema
 data class AiSessionCreate(
     @get:Schema(title = "项目ID，空表示公共会话", required = false)
     val projectId: String? = null,
-    @get:Schema(title = "会话标题", required = false)
-    val title: String? = null
+    @get:Schema(
+        title = "会话标题，不传时流水线级用流水线名称，否则为「新对话」",
+        required = false
+    )
+    val title: String? = null,
+    @get:Schema(title = "流水线ID，空表示项目级或公共会话", required = false)
+    val pipelineId: String? = null
 )
