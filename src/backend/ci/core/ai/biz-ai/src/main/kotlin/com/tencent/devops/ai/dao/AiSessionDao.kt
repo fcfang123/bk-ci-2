@@ -103,21 +103,6 @@ class AiSessionDao {
         }
     }
 
-    fun countByUserAndScope(
-        dslContext: DSLContext,
-        userId: String,
-        projectId: String?,
-        pipelineId: String?
-    ): Int {
-        with(TAiSession.T_AI_SESSION) {
-            return dslContext.selectCount()
-                .from(this)
-                .where(USER_ID.eq(userId))
-                .and(scopeCondition(projectId, pipelineId))
-                .fetchOne(0, Int::class.java) ?: 0
-        }
-    }
-
     private fun scopeCondition(
         projectId: String?,
         pipelineId: String?

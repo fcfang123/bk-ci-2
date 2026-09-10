@@ -34,16 +34,12 @@ import com.tencent.devops.ai.pojo.AiSessionCreate
 import com.tencent.devops.ai.pojo.AiSessionInfo
 import com.tencent.devops.common.api.exception.ErrorCodeException
 import com.tencent.devops.common.api.util.UUIDUtil
-import com.tencent.devops.common.client.Client
 import com.tencent.devops.model.ai.tables.records.TAiSessionRecord
-import com.tencent.devops.process.api.service.ServicePipelineResource
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /**
  * AI 会话管理服务。
@@ -55,8 +51,7 @@ import java.time.format.DateTimeFormatter
 class AiSessionService @Autowired constructor(
     private val dslContext: DSLContext,
     private val aiSessionDao: AiSessionDao,
-    private val aiMessageService: AiMessageService,
-    private val client: Client
+    private val aiMessageService: AiMessageService
 ) {
 
     fun createSession(
@@ -67,12 +62,7 @@ class AiSessionService @Autowired constructor(
         val pipelineId = blankToNull(request.pipelineId)
         validateScope(projectId, pipelineId)
         val id = UUIDUtil.generate()
-        val title = resolveTitle(
-            userId = userId,
-            explicitTitle = request.title,
-            projectId = projectId,
-            pipelineId = pipelineId
-        )
+        val title = blankToNull(request.title) ?: DEFAULT_TITLE
         logger.info(
             "[Session] Creating: id={}, userId={}, " +
                 "projectId={}, pipelineId={}, title={}",
@@ -98,8 +88,8 @@ class AiSessionService @Autowired constructor(
      * 确保会话存在；若不存在则自动创建。
      *
      * 由 AG-UI 协议驱动调用，保证对话请求始终有关联会话。
-     * 新建会话标题优先级：显式标题 > 流水线名称（同流水线后续会话追加时间） >
-     * 首条用户消息 > 「新对话」。
+     * 新建会话时，若提供了 [firstUserMessage]，则截取前 [MAX_TITLE_LENGTH]
+     * 个字符作为会话标题，否则使用默认标题「新对话」。
      */
     fun ensureSession(
         sessionId: String,
@@ -111,21 +101,14 @@ class AiSessionService @Autowired constructor(
         val normalizedProjectId = blankToNull(projectId)
         val normalizedPipelineId = blankToNull(pipelineId)
         validateScope(normalizedProjectId, normalizedPipelineId)
-        val title = resolveTitle(
-            userId = userId,
-            explicitTitle = null,
-            projectId = normalizedProjectId,
-            pipelineId = normalizedPipelineId,
-            firstUserMessage = firstUserMessage
-        )
+        val title = deriveTitle(firstUserMessage)
         val existing = aiSessionDao.getById(dslContext, sessionId)
         if (existing != null) {
-            val derivedTitle = deriveTitle(firstUserMessage)
-            if (derivedTitle != null && existing.title == DEFAULT_TITLE) {
-                aiSessionDao.updateTitle(dslContext, sessionId, derivedTitle)
+            if (title != null && existing.title == DEFAULT_TITLE) {
+                aiSessionDao.updateTitle(dslContext, sessionId, title)
                 logger.info(
                     "[Session] Updated default title: id={}, newTitle={}",
-                    sessionId, derivedTitle
+                    sessionId, title
                 )
             }
             return
@@ -133,7 +116,7 @@ class AiSessionService @Autowired constructor(
         logger.info(
             "[Session] Auto-creating session from AG-UI: " +
                 "id={}, userId={}, projectId={}, pipelineId={}, title={}",
-            sessionId, userId, normalizedProjectId, normalizedPipelineId, title
+            sessionId, userId, normalizedProjectId, normalizedPipelineId, title ?: DEFAULT_TITLE
         )
         aiSessionDao.create(
             dslContext = dslContext,
@@ -141,7 +124,7 @@ class AiSessionService @Autowired constructor(
             userId = userId,
             projectId = normalizedProjectId,
             pipelineId = normalizedPipelineId,
-            title = title
+            title = title ?: DEFAULT_TITLE
         )
     }
 
@@ -309,7 +292,6 @@ class AiSessionService @Autowired constructor(
         private const val DEFAULT_TITLE = "新对话"
         /** 会话标题最大字符数 */
         private const val MAX_TITLE_LENGTH = 50
-        private val TITLE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     }
 
     private fun toSessionInfo(record: TAiSessionRecord): AiSessionInfo {
@@ -333,79 +315,6 @@ class AiSessionService @Autowired constructor(
                 defaultMessage = "Pipeline-level session requires projectId"
             )
         }
-    }
-
-    private fun resolveTitle(
-        userId: String,
-        explicitTitle: String?,
-        projectId: String?,
-        pipelineId: String?,
-        firstUserMessage: String? = null
-    ): String {
-        blankToNull(explicitTitle)?.let { return truncateTitle(it) }
-        lookupPipelineName(projectId, pipelineId)?.let { name ->
-            return formatPipelineTitle(
-                userId = userId,
-                projectId = projectId,
-                pipelineId = pipelineId,
-                pipelineName = name
-            )
-        }
-        deriveTitle(firstUserMessage)?.let { return it }
-        return DEFAULT_TITLE
-    }
-
-    private fun formatPipelineTitle(
-        userId: String,
-        projectId: String?,
-        pipelineId: String?,
-        pipelineName: String
-    ): String {
-        val normalized = truncateTitle(pipelineName)
-        val existingCount = aiSessionDao.countByUserAndScope(
-            dslContext = dslContext,
-            userId = userId,
-            projectId = projectId,
-            pipelineId = pipelineId
-        )
-        if (existingCount <= 0) {
-            return normalized
-        }
-        val suffix = " " + LocalDateTime.now().format(TITLE_TIME_FORMATTER)
-        val namePart = normalized.take(
-            (MAX_TITLE_LENGTH - suffix.length).coerceAtLeast(1)
-        )
-        return (namePart + suffix).take(MAX_TITLE_LENGTH)
-    }
-
-    private fun lookupPipelineName(projectId: String?, pipelineId: String?): String? {
-        if (projectId == null || pipelineId == null) {
-            return null
-        }
-        return try {
-            client.get(ServicePipelineResource::class)
-                .getPipelineInfo(
-                    projectId = projectId,
-                    pipelineId = pipelineId,
-                    channelCode = null,
-                    archiveFlag = false
-                )
-                .data
-                ?.pipelineName
-                ?.trim()
-                ?.ifBlank { null }
-        } catch (e: Exception) {
-            logger.warn(
-                "[Session] Failed to resolve pipeline name: " +
-                    "projectId={}, pipelineId={}, error={}",
-                projectId, pipelineId, e.message
-            )
-            null
-        }
-    }
-
-    private fun truncateTitle(title: String): String {
-        return title.replace(Regex("\\s+"), " ").take(MAX_TITLE_LENGTH)
     }
 
     private fun blankToNull(value: String?): String? {
