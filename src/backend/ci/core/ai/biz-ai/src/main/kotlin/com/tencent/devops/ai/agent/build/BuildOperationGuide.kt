@@ -51,8 +51,8 @@ internal fun buildOperationGuideMarkdown(): String = """
 3. **中文回复**: 结构化呈现关键信息。
 4. **名称转 ID**: 项目名称 → 调用 resolveProjectId；流水线名称 → 调用「搜索流水线」。
 5. **报错分析先走一键工具**: 用户问"为什么失败/报错/挂了"时，先调「分析构建失败」，不要一上来直接拉日志（详见工作流「分析构建错误」）。
-6. **查编排优先完整、过大再降级**: 默认先「获取流水线编排」；若返回对象过大、内容被截断，或只需补某个局部节点，再结合「获取流水线编排摘要」与「获取流水线编排节点详情」。
-7. **编排解读结合技能且区分排障**: 解释"流水线做什么 / 某 Stage/Job/插件含义"属于编排解读场景，不要调「分析构建失败」，须结合已加载的「流水线编排解释」技能（pipeline-model-interpreter）逐层解读（详见工作流「分析/解释流水线编排」）。
+6. **编排分析默认隔离**: 理解或分析流水线时默认调用「分析流水线编排」，由后端固定版本、限制预算并隔离切片；只有用户明确要求原始 Model 时才调用兼容工具「获取流水线编排」。
+7. **编排范围明确时下钻**: 用户指定 Stage/Job/插件时，把定位键传给「分析流水线编排」，后端会自动使用 LOCAL；不要先拉全量 Model。
 8. **必要时查 iWiki**: 遇到不熟悉的错误码/插件配置/平台限制，用 iWiki MCP 辅助（详见「iWiki 文档搜索」）。
 9. **深度诊断结合技能**: 做失败根因定位、历史稳定性判定、构建对比、卡住检测、子流水线递归或诊断报告时，结合已加载的「流水线构建诊断」技能（pipeline-build-diagnosis）的方法论与错误码/根因模式库。
 
@@ -71,9 +71,10 @@ internal fun buildOperationGuideMarkdown(): String = """
 | 搜索流水线 | `搜索流水线(projectId, keyword?, page?, pageSize?)` |
 | 查看流水线基本信息 | `获取流水线信息(projectId, pipelineId)` |
 | 查看流水线当前状态（原始状态信息） | `获取流水线状态(projectId, pipelineId)` |
-| 查看流水线轻量编排摘要（编排过大/只看骨架时） | `获取流水线编排摘要(projectId, pipelineId, version?, includeElements?)` |
+| 理解/分析流水线编排（默认） | `分析流水线编排(projectId, pipelineId, question, version?, mode?, stageId?, jobId?, elementId?)` |
+| 查看流水线轻量编排摘要 | `获取流水线编排摘要(projectId, pipelineId, version?, includeElements?)` |
 | 查看指定 Stage/Job/插件 的轻量详情 | `获取流水线编排节点详情(projectId, pipelineId, version?, stageId?, containerHashId?, containerId?, jobId?, elementId?, stepId?)` |
-| 查看流水线编排（Model，可指定版本） | `获取流水线编排(projectId, pipelineId, version?)` |
+| 获取原始流水线编排（仅用户明确要求） | `获取流水线编排(projectId, pipelineId, version?)` |
 
 ### 构建操作（写操作需确认）
 | 场景 | 工具 |
@@ -191,21 +192,12 @@ internal fun buildOperationGuideMarkdown(): String = """
 **不要**调用「分析构建失败」等运行态排障工具。
 ```
 1. 确定流水线：名称先「搜索流水线」拿 pipelineId；URL 按解析规则提取
-2. 默认先调「获取流水线编排」，解读主流程、插件输入输出、变量传递、模板展开和复杂控制项时优先看完整编排
-3. 如果完整编排返回对象过大、内容被截断，先退到「获取流水线编排摘要」：
-   - 先保住整体 Stage/Job/Step 结构、名称、ID、容器类型、定位键
-   - 必要时可设 includeElements=false，只先看 Stage/Job 骨架
-4. 用户追问某个 Stage/Job/插件，或摘要里已出现明确定位键（stageId/containerHashId/containerId/jobId/elementId/stepId）时，
-   调「获取流水线编排节点详情」补该节点的父链路径、控制项与轻量详情，用局部详情替代再次硬拉大对象
-5. 拿到编排信息后，**必须结合已加载的「流水线编排解释」技能（pipeline-model-interpreter）**逐层解读，
-   不要仅凭直觉；按 Model -> Stage -> Container(Job) -> Element 四层展开：
-   - 先看 TriggerContainer.params 启动参数（敏感/PASSWORD 只说"敏感参数"，不回显默认值）
-   - 判断容器类型（trigger/vmBuild/normal）、构建资源（dispatchType）、控制项
-     （runCondition/矩阵/互斥/Finally/审核 checkIn/checkOut）
-   - 解释插件时同时看 @type、atomCode、name、data.input、data.output 与 additionalOptions
-   - classType/枚举/dispatchType 等字面量以技能中的速查清单为准，注意大小写
-   - 遇到未知 atomCode 保守表述"需结合插件文档确认"，不臆测；忽略 status 等运行态字段
-6. 用户只贴一段 Model JSON 让你解释时，直接结合该技能按第 5 步解读，无需再调查询工具
+2. 默认调用「分析流水线编排」，把用户问题原样放入 question；后端会一次授权读取、固定 effectiveVersion 并先返回有界概况
+3. 默认 mode=DIRECT；超过硬预算时后端自动切到 SPLIT，并在结果返回 requestedMode/effectiveMode/modeReason
+4. 用户明确指定 Stage/Job/插件时传 stageId/jobId/elementId，后端自动使用 LOCAL；不要先拉全量 Model
+5. 分析期间只向用户展示读取、制定计划、拆分 x/y、汇总、完成/部分完成进度，不转发子推理或 Model 原文
+6. 只有用户明确要求原始 Model 时才调用「获取流水线编排」；轻量摘要和节点详情仅用于查询展示或兼容路径
+7. 用户只贴一段 Model JSON 让你解释时，结合已加载的 pipeline-model-interpreter 直接解读，无需查询流水线
 ```
 
 **注意**：编排解读默认只解释"配置在定义什么"，不主动给修改/优化建议（用户明确要求时才给）；

@@ -29,9 +29,13 @@ package com.tencent.devops.ai.agent.build
 
 import com.tencent.devops.ai.agent.CommonTools
 import com.tencent.devops.ai.agent.SubAgentDefinition
+import com.tencent.devops.ai.context.AgentSessionContext
 import com.tencent.devops.ai.pojo.ChatContextDTO
+import com.tencent.devops.ai.pojo.PipelineAnalysisInvocationContext
+import com.tencent.devops.ai.service.pipeline.PipelineModelAnalysisService
 import com.tencent.devops.common.client.Client
 import io.agentscope.core.ReActAgent
+import io.agentscope.core.agui.event.AguiEvent
 import io.agentscope.core.hook.Hook
 import io.agentscope.core.memory.autocontext.AutoContextConfig
 import io.agentscope.core.memory.autocontext.AutoContextMemory
@@ -39,22 +43,25 @@ import io.agentscope.core.model.Model
 import io.agentscope.core.tool.Toolkit
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
+import java.util.concurrent.atomic.AtomicReference
+import java.util.function.Supplier
 
 /**
  * 流水线构建子智能体定义。
  */
 @Component
 class BuildSubAgentDefinition @Autowired constructor(
-    private val client: Client
+    private val client: Client,
+    private val pipelineModelAnalysisService: PipelineModelAnalysisService,
+    private val sessionContext: AgentSessionContext
 ) : SubAgentDefinition {
 
     override fun toolName(): String = "build_agent"
 
     override fun description(): String =
-        "流水线构建智能体，负责流水线基本信息/编排model查询、构建触发与管理、构建日志分析。" +
-                "当用户询问流水线信息/编排、触发/停止/重试构建、" +
-                "查看构建历史/详情/状态/变量、" +
-                "分析构建错误日志等相关问题时使用。"
+        "流水线构建智能体，负责流水线基本信息/编排分析、构建触发与管理、" +
+            "构建日志分析。当用户询问流水线信息/编排、触发/停止/重试构建、" +
+            "查看构建历史/详情/状态/变量、分析构建错误日志等相关问题时使用。"
 
     override fun defaultSysPrompt(): String = buildOperationGuideMarkdown()
 
@@ -68,7 +75,33 @@ class BuildSubAgentDefinition @Autowired constructor(
         autoContextConfig: AutoContextConfig
     ): ReActAgent {
         toolkit.registerTool(CommonTools(client) { userId })
-        toolkit.registerTool(BuildTools(client) { userId })
+        val agentRef = AtomicReference<ReActAgent>()
+        val analysisContextSupplier = Supplier<PipelineAnalysisInvocationContext?> {
+            val parentAgent = agentRef.get()
+            val sinkInfo = parentAgent?.let { sessionContext.getSinkByAgent(it) }
+            PipelineAnalysisInvocationContext(
+                model = model,
+                threadId = parentAgent?.let { sessionContext.getThreadIdByAgent(it) },
+                progressConsumer = { progress ->
+                    sinkInfo?.sink?.tryEmitNext(
+                        AguiEvent.Raw(
+                            sinkInfo.threadId,
+                            sinkInfo.runId,
+                            mapOf("pipelineAnalysisProgress" to progress)
+                        )
+                    )
+                }
+            )
+        }
+        toolkit.registerTool(
+            BuildTools(
+                client = client,
+                userIdSupplier = { userId },
+                sleepFn = Thread::sleep,
+                pipelineModelAnalysisService = pipelineModelAnalysisService,
+                analysisContextSupplier = analysisContextSupplier
+            )
+        )
 
         val projectId = chatContext.projectId
         val pipelineId = chatContext.pipelineId
@@ -80,7 +113,7 @@ class BuildSubAgentDefinition @Autowired constructor(
             .replace("{{pipelineId}}", pipelineId ?: "未知")
             .replace("{{buildId}}", buildId ?: "未知")
 
-        return ReActAgent.builder()
+        val agent = ReActAgent.builder()
             .name("流水线构建助手")
             .sysPrompt(resolvedPrompt)
             .model(model)
@@ -88,5 +121,7 @@ class BuildSubAgentDefinition @Autowired constructor(
             .memory(AutoContextMemory(autoContextConfig, model))
             .hooks(hooks)
             .build()
+        agentRef.set(agent)
+        return agent
     }
 }

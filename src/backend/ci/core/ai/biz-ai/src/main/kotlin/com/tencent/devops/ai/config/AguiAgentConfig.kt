@@ -55,7 +55,7 @@ class AguiAgentConfig {
                 supervisorAgentFactory.get()
             }
 
-            subAgentDefinitions.forEach { definition ->
+            subAgentDefinitions.filter { it.exposeAsStandalone() }.forEach { definition ->
                 val agentId = definition.toolName()
                 require(agentId != AGENT_ID) {
                     "SubAgentDefinition toolName '$agentId' " +

@@ -4,6 +4,8 @@ import com.tencent.devops.ai.api.op.OpAiSkillResource
 import com.tencent.devops.ai.pojo.AiSkillCreate
 import com.tencent.devops.ai.pojo.AiSkillInfo
 import com.tencent.devops.ai.pojo.AiSkillUpdate
+import com.tencent.devops.ai.pojo.AgentInfo
+import com.tencent.devops.ai.service.AiAgentInvocationService
 import com.tencent.devops.ai.service.AiSkillService
 import com.tencent.devops.common.api.pojo.Result
 import com.tencent.devops.common.web.RestResource
@@ -11,9 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired
 
 @RestResource
 class OpAiSkillResourceImpl @Autowired constructor(
-    private val skillService: AiSkillService
+    private val skillService: AiSkillService,
+    private val agentInvocationService: AiAgentInvocationService
 ) : OpAiSkillResource {
     override fun list(): Result<List<AiSkillInfo>> = Result(skillService.listAllForOp())
+    override fun listBindAgents(): Result<List<AgentInfo>> = Result(agentInvocationService.listSkillBindingAgents())
     override fun create(request: AiSkillCreate): Result<AiSkillInfo> = Result(skillService.createSystem(request))
     override fun update(skillId: String, request: AiSkillUpdate): Result<Boolean> =
         Result(skillService.updateForOp(skillId, request))

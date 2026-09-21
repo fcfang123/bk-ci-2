@@ -28,6 +28,11 @@
 package com.tencent.devops.ai.agent.build
 
 import com.tencent.devops.ai.agent.BaseTools
+import com.tencent.devops.ai.agent.build.analysis.PipelineModelSanitizer
+import com.tencent.devops.ai.pojo.PipelineAnalysisInvocationContext
+import com.tencent.devops.ai.pojo.PipelineAnalysisMode
+import com.tencent.devops.ai.pojo.PipelineAnalysisScope
+import com.tencent.devops.ai.service.pipeline.PipelineModelAnalysisService
 import com.tencent.devops.common.api.util.JsonUtil
 import com.tencent.devops.common.client.Client
 import com.tencent.devops.common.log.pojo.QueryLogsText
@@ -55,15 +60,24 @@ import java.util.function.Supplier
 class BuildTools(
     client: Client,
     userIdSupplier: Supplier<String>,
-    private val sleepFn: (Long) -> Unit
+    private val sleepFn: (Long) -> Unit,
+    private val pipelineModelAnalysisService: PipelineModelAnalysisService?,
+    private val analysisContextSupplier: Supplier<PipelineAnalysisInvocationContext?>
 ) : BaseTools(client, userIdSupplier) {
 
     constructor(
         client: Client,
         userIdSupplier: Supplier<String>
-    ) : this(client, userIdSupplier, Thread::sleep)
+    ) : this(client, userIdSupplier, Thread::sleep, null, Supplier { null })
+
+    constructor(
+        client: Client,
+        userIdSupplier: Supplier<String>,
+        sleepFn: (Long) -> Unit
+    ) : this(client, userIdSupplier, sleepFn, null, Supplier { null })
 
     override val logger: Logger = LoggerFactory.getLogger(BuildTools::class.java)
+    private val pipelineModelSanitizer = PipelineModelSanitizer()
 
     private fun pipelineResource() = service(ServicePipelineResource::class)
     private fun versionResource() = service(ServicePipelineVersionResource::class)
@@ -156,10 +170,62 @@ class BuildTools(
     }
 
     @Tool(
+        name = "分析流水线编排",
+        description = "默认的流水线编排理解入口。后端一次读取并固定版本，" +
+            "先生成有界概况，再按预算隔离分析。DIRECT 超限自动 SPLIT；" +
+            "传 stageId/jobId/elementId 时自动 LOCAL。不会返回原始大 Model。"
+    )
+    @Suppress("LongParameterList")
+    fun analyzePipelineModel(
+        @ToolParam(name = "projectId", description = "项目ID")
+        projectId: String,
+        @ToolParam(name = "pipelineId", description = "流水线ID")
+        pipelineId: String,
+        @ToolParam(name = "question", description = "用户希望理解或分析的目标")
+        question: String,
+        @ToolParam(
+            name = "version",
+            description = "流水线版本号（可选，不传则读取并固定最新正式版本）",
+            required = false
+        )
+        version: Int? = null,
+        @ToolParam(
+            name = "mode",
+            description = "DIRECT 或 SPLIT，默认 DIRECT；局部范围自动 LOCAL",
+            required = false
+        )
+        mode: String? = null,
+        @ToolParam(name = "stageId", description = "限定 Stage ID 或用户自定义 ID", required = false)
+        stageId: String? = null,
+        @ToolParam(name = "jobId", description = "限定 Job ID、容器 ID 或 Hash ID", required = false)
+        jobId: String? = null,
+        @ToolParam(name = "elementId", description = "限定插件 elementId 或 stepId", required = false)
+        elementId: String? = null
+    ): String {
+        return safeQuery("BuildArtifactTool", "analyzePipelineModel") {
+            val service = pipelineModelAnalysisService
+                ?: return@safeQuery "当前入口未配置流水线编排隔离分析服务"
+            val context = analysisContextSupplier.get()
+                ?: return@safeQuery "当前入口缺少流水线编排分析模型上下文"
+            toJson(
+                service.analyze(
+                    userId = getOperatorUserId(),
+                    projectId = projectId,
+                    pipelineId = pipelineId,
+                    version = version,
+                    question = question,
+                    requestedMode = PipelineAnalysisMode.parse(mode),
+                    scope = PipelineAnalysisScope(stageId, jobId, elementId),
+                    invocationContext = context
+                )
+            )
+        }
+    }
+
+    @Tool(
         name = "获取流水线编排",
-        description = "获取流水线的编排 Model，包括阶段、任务、参数等。" +
-                "支持按指定版本号查询；version 不传时默认返回最新正式版本。" +
-                "若完整编排过大，会自动退化为去除 setting 的结果或轻量摘要，避免返回半截 JSON。"
+        description = "兼容旧调用的流水线完整 Model 查询，不作为编排分析默认入口。" +
+            "支持指定版本；过大时仍自动降级，新的理解类请求请使用「分析流水线编排」。"
     )
     fun getPipelineModel(
         @ToolParam(name = "projectId", description = "项目ID")
@@ -266,7 +332,7 @@ class BuildTools(
                 }
 
                 matches.size == 1 -> {
-                    toJson(matches.single())
+                    toJson(pipelineModelSanitizer.sanitize(matches.single()))
                 }
 
                 else -> {
@@ -1023,10 +1089,10 @@ class BuildTools(
             "latestVersion" to data.latestVersion,
             "includeSetting" to includeSetting,
             "notices" to notices.takeIf { it.isNotEmpty() },
-            "model" to data.modelAndSetting.model
+            "model" to pipelineModelSanitizer.sanitize(data.modelAndSetting.model)
         ).apply {
             if (includeSetting) {
-                this["setting"] = data.modelAndSetting.setting
+                this["setting"] = pipelineModelSanitizer.sanitize(data.modelAndSetting.setting)
             }
         }
     }

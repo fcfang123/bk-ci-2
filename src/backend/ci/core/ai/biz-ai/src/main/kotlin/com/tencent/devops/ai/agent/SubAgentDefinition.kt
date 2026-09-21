@@ -33,6 +33,12 @@ interface SubAgentDefinition {
      */
     fun bindToSupervisor(): Boolean = true
 
+    /** 是否允许通过公开 list/invoke/stream 与 AG-UI agentId 直接访问。 */
+    fun exposeAsStandalone(): Boolean = true
+
+    /** 是否作为 Skill 配置的绑定目标候选。 */
+    fun skillBindingCandidate(): Boolean = true
+
     /** 硬编码的默认系统提示词，当数据库未配置时使用。 */
     fun defaultSysPrompt(): String
 

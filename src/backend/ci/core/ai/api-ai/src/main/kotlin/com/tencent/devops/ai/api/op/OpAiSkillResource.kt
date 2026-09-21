@@ -3,6 +3,7 @@ package com.tencent.devops.ai.api.op
 import com.tencent.devops.ai.pojo.AiSkillCreate
 import com.tencent.devops.ai.pojo.AiSkillInfo
 import com.tencent.devops.ai.pojo.AiSkillUpdate
+import com.tencent.devops.ai.pojo.AgentInfo
 import com.tencent.devops.common.api.pojo.Result
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -27,6 +28,11 @@ interface OpAiSkillResource {
     @GET
     @Path("/")
     fun list(): Result<List<AiSkillInfo>>
+
+    @Operation(summary = "获取 Skill 可绑定的 Agent 候选")
+    @GET
+    @Path("/bind-agents")
+    fun listBindAgents(): Result<List<AgentInfo>>
 
     @Operation(summary = "新增系统技能")
     @POST

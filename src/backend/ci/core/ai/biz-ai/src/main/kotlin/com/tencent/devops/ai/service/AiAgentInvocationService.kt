@@ -63,12 +63,11 @@ class AiAgentInvocationService @Autowired constructor(
 ) {
 
     fun listAgents(): List<AgentInfo> {
-        return subAgentDefinitions.map { definition ->
-            AgentInfo(
-                name = definition.toolName(),
-                description = definition.description()
-            )
-        }
+        return subAgentDefinitions.filter { it.exposeAsStandalone() }.map(::toAgentInfo)
+    }
+
+    fun listSkillBindingAgents(): List<AgentInfo> {
+        return subAgentDefinitions.filter { it.skillBindingCandidate() }.map(::toAgentInfo)
     }
 
     fun invokeAgent(
@@ -77,7 +76,7 @@ class AiAgentInvocationService @Autowired constructor(
         request: ServiceAgentRunRequest
     ): ServiceAgentRunResponse {
         subAgentDefinitions.find {
-            it.toolName() == agentName
+            it.exposeAsStandalone() && it.toolName() == agentName
         } ?: throw ErrorCodeException(
             errorCode = AiMessageCode.AGENT_NOT_FOUND,
             defaultMessage = "Agent not found: $agentName",
@@ -124,7 +123,7 @@ class AiAgentInvocationService @Autowired constructor(
         output: ChunkedOutput<String>
     ) {
         subAgentDefinitions.find {
-            it.toolName() == agentName
+            it.exposeAsStandalone() && it.toolName() == agentName
         } ?: throw ErrorCodeException(
             errorCode = AiMessageCode.AGENT_NOT_FOUND,
             defaultMessage = "Agent not found: $agentName",
@@ -203,6 +202,13 @@ class AiAgentInvocationService @Autowired constructor(
         } finally {
             cleanupContext(threadId)
         }
+    }
+
+    private fun toAgentInfo(definition: SubAgentDefinition): AgentInfo {
+        return AgentInfo(
+            name = definition.toolName(),
+            description = definition.description()
+        )
     }
 
     private fun setupContext(

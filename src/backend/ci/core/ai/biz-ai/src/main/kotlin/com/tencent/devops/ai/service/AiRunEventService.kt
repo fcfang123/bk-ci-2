@@ -31,6 +31,7 @@ import com.tencent.devops.ai.context.AgentSessionContext
 import com.tencent.devops.ai.dao.AiRunEventDao
 import com.tencent.devops.ai.pojo.AiAgentStageMetadata.SessionStatus
 import com.tencent.devops.ai.pojo.event.AiRunStopBroadcastEvent
+import com.tencent.devops.ai.service.pipeline.PipelineAnalysisRunRegistry
 import com.tencent.devops.ai.util.SseEventWriter
 import io.agentscope.core.agui.encoder.AguiEventEncoder
 import io.agentscope.core.agui.event.AguiEvent
@@ -54,7 +55,8 @@ class AiRunEventService @Autowired constructor(
     private val aiAgentStageService: AiAgentStageService,
     private val dslContext: DSLContext,
     private val activeRunManager: ActiveRunManager,
-    private val sessionContext: AgentSessionContext
+    private val sessionContext: AgentSessionContext,
+    private val pipelineAnalysisRunRegistry: PipelineAnalysisRunRegistry
 ) {
 
     /**
@@ -262,6 +264,7 @@ class AiRunEventService @Autowired constructor(
         event: AiRunStopBroadcastEvent,
         activeRunManager: ActiveRunManager
     ) {
+        pipelineAnalysisRunRegistry.cancel(event.threadId)
         val activeRun = activeRunManager.get(event.threadId)
         if (activeRun != null) {
             logger.info(
