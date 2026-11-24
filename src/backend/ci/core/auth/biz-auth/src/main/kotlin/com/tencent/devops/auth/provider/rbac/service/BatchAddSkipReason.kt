@@ -17,5 +17,9 @@ enum class BatchAddSkipReason(
     ALREADY_IN_GROUP_BY_DEPARTMENT(
         messageCode = AuthI18nConstants.BK_BATCH_ADD_MEMBERS_SKIP_USER_ALREADY_IN_GROUP_BY_DEPARTMENT,
         defaultMessage = "以下用户已通过所在组织加入当前组，无需重复添加"
+    ),
+    DEPARTMENT_NOT_FOUND(
+        messageCode = AuthI18nConstants.BK_BATCH_ADD_MEMBERS_SKIP_DEPARTMENT_NOT_FOUND,
+        defaultMessage = "以下组织不存在，未添加"
     )
 }

@@ -152,4 +152,6 @@ object AuthMessageCode {
     const val ERROR_SINGLE_GROUP_REMOVE = "2121098" // 由于直接退出用户组，会导致授权失效，必须进行用户组移交
     const val ERROR_USER_CONTRACT_NOT_SIGNED = "2121099"
     const val ERROR_DUPLICATE_RESOURCE_NAME = "2121100" // 存在多个同名资源
+    // 批量添加用户组成员失败, 成员:{0}, 原因:{1}
+    const val ERROR_BATCH_ADD_GROUP_MEMBERS = "2121101"
 }

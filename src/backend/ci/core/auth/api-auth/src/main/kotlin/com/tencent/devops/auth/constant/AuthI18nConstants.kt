@@ -63,6 +63,8 @@ object AuthI18nConstants {
         "bkBatchAddMembersSkipUserAlreadyInGroupByDepartment" // 以下用户已通过所在组织加入当前组，无需重复添加：{0}
     const val BK_BATCH_ADD_MEMBERS_SKIP_DEPARTMENTS =
         "bkBatchAddMembersSkipDepartments" // 以下组织已在当前组中，无需重复添加：{0}
+    const val BK_BATCH_ADD_MEMBERS_SKIP_DEPARTMENT_NOT_FOUND =
+        "bkBatchAddMembersSkipDepartmentNotFound" // 以下组织不存在，未添加：{0}
 
     const val BK_APPLY_TO_HANDOVER = "bkApplyToHandover" // 申请移交
     const val BK_HANDOVER_GROUPS = "bkHandoverGroups" // 个权限用户组

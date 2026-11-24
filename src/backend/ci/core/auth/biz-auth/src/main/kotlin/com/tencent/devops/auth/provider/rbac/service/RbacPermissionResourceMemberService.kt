@@ -228,16 +228,17 @@ class RbacPermissionResourceMemberService(
             errorCode = AuthMessageCode.GROUP_NOT_EXIST
         )
         val managerMember = ManagerMember(memberType, memberId)
+        // 先校验成员信息, 校验通过后再写 IAM, 避免 IAM 已写入而本地库未写入
+        val memberDetails = deptService.getMemberInfo(
+            memberId = memberId,
+            memberType = ManagerScopesEnum.valueOf(memberType.uppercase())
+        )
         addIamGroupMember(
             groupId = iamGroupId,
             members = listOf(managerMember),
             expiredAt = expiredAt
         )
 
-        val memberDetails = deptService.getMemberInfo(
-            memberId = memberId,
-            memberType = ManagerScopesEnum.valueOf(memberType.uppercase())
-        )
         with(authResourceGroup) {
             authResourceGroupMemberDao.create(
                 dslContext = dslContext,
@@ -276,7 +277,7 @@ class RbacPermissionResourceMemberService(
         return true
     }
 
-    @Suppress("NestedBlockDepth")
+    @Suppress("NestedBlockDepth", "LongMethod", "ComplexMethod")
     override fun batchAddResourceGroupMembers(
         projectCode: String,
         iamGroupId: Int,
@@ -299,9 +300,7 @@ class RbacPermissionResourceMemberService(
             it.type == deptType && it.expiredAt > LocalDateTime.now().timestamp()
         }.map { it.id }.toSet()
         // 校验用户是否应该加入用户组
-        val iamMemberInfos = mutableListOf<ManagerMember>()
-        val addedUsers = mutableListOf<String>()
-        val addedDepartments = mutableListOf<String>()
+        val candidateMembers = mutableListOf<ManagerMember>()
         val skippedUsersByReason = linkedMapOf<BatchAddSkipReason, MutableList<String>>()
         val skippedDepartments = mutableListOf<String>()
         if (!members.isNullOrEmpty()) {
@@ -327,10 +326,7 @@ class RbacPermissionResourceMemberService(
                             member = member
                         )
                     ) {
-                        BatchAddUserResult.ADD -> {
-                            iamMemberInfos.add(ManagerMember(userType, member))
-                            addedUsers.add(member)
-                        }
+                        BatchAddUserResult.ADD -> candidateMembers.add(ManagerMember(userType, member))
 
                         BatchAddUserResult.ALREADY_IN_GROUP,
                         BatchAddUserResult.ALREADY_IN_GROUP_BY_DEPARTMENT,
@@ -346,22 +342,49 @@ class RbacPermissionResourceMemberService(
         if (!departments.isNullOrEmpty()) {
             departments.forEach { department ->
                 if (!groupDepartmentSet.contains(department)) {
-                    iamMemberInfos.add(ManagerMember(deptType, department))
-                    addedDepartments.add(department)
+                    candidateMembers.add(ManagerMember(deptType, department))
                 } else {
                     skippedDepartments.add(department)
                 }
             }
         }
+        // 成员信息校验前置到写 IAM 之前, 校验不通过的成员跳过, 避免 IAM 已写入而本地库未写入的数据不一致
+        val validatedMembers = mutableListOf<ValidatedGroupMember>()
+        val invalidMemberIds = mutableListOf<String>()
+        candidateMembers.forEach { candidateMember ->
+            when (val validateResult = validateMemberInfo(candidateMember)) {
+                is MemberValidateResult.Valid -> validatedMembers.add(
+                    ValidatedGroupMember(member = candidateMember, displayName = validateResult.displayName)
+                )
 
-        logger.info("batch add project user:|$projectCode|$iamGroupId|$expiredTime|$iamMemberInfos")
-        if (iamMemberInfos.isNotEmpty()) {
-            addIamGroupMember(
-                groupId = iamGroupId,
-                members = iamMemberInfos,
-                expiredAt = expiredTime
+                MemberValidateResult.NotFound -> {
+                    val skipReason = if (candidateMember.type == deptType) {
+                        BatchAddSkipReason.DEPARTMENT_NOT_FOUND
+                    } else {
+                        BatchAddSkipReason.USER_NOT_FOUND_OR_DEPARTED
+                    }
+                    skippedUsersByReason.getOrPut(skipReason) { mutableListOf() }.add(candidateMember.id)
+                }
+
+                is MemberValidateResult.Failed -> invalidMemberIds.add(candidateMember.id)
+            }
+        }
+        // 校验过程本身异常时显式失败, 此时尚未写 IAM, 无副作用且调用方可安全重试
+        if (invalidMemberIds.isNotEmpty()) {
+            logger.warn("batch add group members, member validate error|$projectCode|$iamGroupId|$invalidMemberIds")
+            throw ErrorCodeException(
+                errorCode = AuthMessageCode.ERROR_BATCH_ADD_GROUP_MEMBERS,
+                params = arrayOf(invalidMemberIds.joinToString(","), "validate member info failed"),
+                defaultMessage = "validate member info failed, members: $invalidMemberIds"
             )
-            // 获取对应的资源组
+        }
+        val addedMembers = validatedMembers.map { it.member }
+        val addedUsers = validatedMembers.filter { it.member.type == userType }.map { it.member.id }
+        val addedDepartments = validatedMembers.filter { it.member.type == deptType }.map { it.member.id }
+
+        logger.info("batch add project user:|$projectCode|$iamGroupId|$expiredTime|$addedMembers")
+        if (addedMembers.isNotEmpty()) {
+            // 提前获取资源组, 避免 IAM 写入成功后再因本地数据缺失而失败
             val authResourceGroup = authResourceGroupDao.get(
                 dslContext = dslContext,
                 projectCode = projectCode,
@@ -369,35 +392,46 @@ class RbacPermissionResourceMemberService(
             ) ?: throw ErrorCodeException(
                 errorCode = AuthMessageCode.GROUP_NOT_EXIST
             )
-            val groupMembersList = mutableListOf<AuthResourceGroupMember>()
-            iamMemberInfos.forEach {
-                val memberDetails = deptService.getMemberInfo(
-                    memberId = it.id,
-                    memberType = ManagerScopesEnum.valueOf(it.type.uppercase())
-                )
-                groupMembersList.add(
-                    AuthResourceGroupMember(
-                        projectCode = projectCode,
-                        resourceType = authResourceGroup.resourceType,
-                        resourceCode = authResourceGroup.resourceCode,
-                        groupCode = authResourceGroup.groupCode,
-                        iamGroupId = authResourceGroup.relationId.toInt(),
-                        memberId = it.id,
-                        memberName = memberDetails.displayName,
-                        memberType = it.type,
-                        expiredTime = DateTimeUtil.convertTimestampToLocalDateTime(expiredTime),
-                        joinedAt = LocalDateTime.now()
-                    )
+            addIamGroupMember(
+                groupId = iamGroupId,
+                members = addedMembers,
+                expiredAt = expiredTime
+            )
+            val groupMembersList = validatedMembers.map {
+                AuthResourceGroupMember(
+                    projectCode = projectCode,
+                    resourceType = authResourceGroup.resourceType,
+                    resourceCode = authResourceGroup.resourceCode,
+                    groupCode = authResourceGroup.groupCode,
+                    iamGroupId = authResourceGroup.relationId.toInt(),
+                    memberId = it.member.id,
+                    memberName = it.displayName,
+                    memberType = it.member.type,
+                    expiredTime = DateTimeUtil.convertTimestampToLocalDateTime(expiredTime),
+                    joinedAt = LocalDateTime.now()
                 )
             }
-            authResourceGroupMemberDao.batchCreate(
-                dslContext = dslContext,
-                groupMembers = groupMembersList
-            )
-            BkInternalPermissionCache.batchInvalidateProjectUserGroups(
-                projectCode = projectCode,
-                userIds = iamMemberInfos.map { it.id }
-            )
+            try {
+                authResourceGroupMemberDao.batchCreate(
+                    dslContext = dslContext,
+                    groupMembers = groupMembersList
+                )
+                BkInternalPermissionCache.batchInvalidateProjectUserGroups(
+                    projectCode = projectCode,
+                    userIds = addedMembers.map { it.id }
+                )
+            } catch (e: Exception) {
+                logger.error(
+                    "batch add group members failed after iam written|" +
+                            "$projectCode|$iamGroupId|$addedMembers",
+                    e
+                )
+                throw ErrorCodeException(
+                    errorCode = AuthMessageCode.ERROR_BATCH_ADD_GROUP_MEMBERS,
+                    params = arrayOf(addedMembers.joinToString(",") { it.id }, e.message ?: "unknown"),
+                    defaultMessage = "batch add group members failed, members: ${addedMembers.map { it.id }}"
+                )
+            }
         }
         traceEventDispatcher.dispatch(
             AuthProjectLevelPermissionsSyncEvent(
@@ -412,6 +446,38 @@ class RbacPermissionResourceMemberService(
             skippedDepartments = skippedDepartments
         )
         return Result(message = resultMessage, data = true)
+    }
+
+    /**
+     * 校验成员在用户中心是否存在, 并返回其展示信息
+     *
+     * 用户中心明确答复不存在时返回 [MemberValidateResult.NotFound], 由调用方降级为跳过;
+     * 调用本身失败(网络异常、用户中心不可用、返回结构异常)时返回 [MemberValidateResult.Failed],
+     * 由调用方显式失败, 避免静默跳过全部成员。
+     */
+    private fun validateMemberInfo(member: ManagerMember): MemberValidateResult {
+        return try {
+            val memberInfo = deptService.getMemberInfo(
+                memberId = member.id,
+                memberType = ManagerScopesEnum.valueOf(member.type.uppercase())
+            )
+            MemberValidateResult.Valid(displayName = memberInfo.displayName)
+        } catch (e: ErrorCodeException) {
+            if (e.errorCode == AuthMessageCode.USER_NOT_EXIST) {
+                logger.warn("batch add member not exist|${member.type}|${member.id}")
+                MemberValidateResult.NotFound
+            } else {
+                logger.warn("batch add member validate failed|${member.type}|${member.id}|${e.errorCode}", e)
+                MemberValidateResult.Failed(cause = e)
+            }
+        } catch (e: NumberFormatException) {
+            // 部门 ID 非数字时用户中心查询会抛 NumberFormatException, 等价于该部门不存在
+            logger.warn("batch add member id invalid|${member.type}|${member.id}", e)
+            MemberValidateResult.NotFound
+        } catch (e: Exception) {
+            logger.warn("batch add member validate error|${member.type}|${member.id}", e)
+            MemberValidateResult.Failed(cause = e)
+        }
     }
 
     private fun verifyGroupBelongToProject(
